@@ -43,3 +43,6 @@ pip-delete-this-directory.txt
 
 # Local history
 .history/
+
+# Local uploads (Mock Storage)
+backend/uploads/

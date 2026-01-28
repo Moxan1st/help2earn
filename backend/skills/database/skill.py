@@ -24,29 +24,151 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:postgres@localhost:5432/help2earn"
 )
+MOCK_DATABASE = os.getenv("MOCK_DATABASE", "false").lower() == "true"
+
+# In-memory storage for mock mode
+MOCK_DATA = {
+    "facilities": [],
+    "rewards": []
+}
 
 
-class Facility(BaseModel):
-    """Facility data model."""
-    id: Optional[str] = None
-    type: str  # ramp, toilet, elevator, wheelchair
-    latitude: float
-    longitude: float
-    image_url: str
-    ai_analysis: Optional[str] = None
-    contributor_address: str
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+class MockRecord(dict):
+    """Mock database record that behaves like asyncpg Record."""
+    def __getattr__(self, name):
+        if name in self:
+            return self[name]
+        raise AttributeError(f"No such attribute: {name}")
 
 
-class Reward(BaseModel):
-    """Reward record model."""
-    id: Optional[str] = None
-    wallet_address: str
-    facility_id: str
-    amount: int
-    tx_hash: Optional[str] = None
-    created_at: Optional[datetime] = None
+class MockConnection:
+    """Mock database connection."""
+    async def execute(self, query, *args):
+        # specific handling for INSERT/UPDATE
+        if "INSERT INTO facilities" in query:
+            # Extract values from args based on query structure
+            # args: id, type, longitude, latitude, image_url, ai_analysis, contributor_address
+            facility = {
+                "id": args[0],
+                "type": args[1],
+                "longitude": args[2],
+                "latitude": args[3],
+                "image_url": args[4],
+                "ai_analysis": args[5],
+                "contributor_address": args[6],
+                "created_at": datetime.now(),
+                "updated_at": datetime.now()
+            }
+            MOCK_DATA["facilities"].append(facility)
+        
+        elif "INSERT INTO rewards" in query:
+            # args: id, wallet_address, facility_id, amount, tx_hash
+            reward = {
+                "id": args[0],
+                "wallet_address": args[1],
+                "facility_id": args[2],
+                "amount": args[3],
+                "tx_hash": args[4],
+                "created_at": datetime.now()
+            }
+            MOCK_DATA["rewards"].append(reward)
+            
+        elif "UPDATE facilities" in query:
+            # args: values..., facility_id
+            facility_id = args[-1]
+            for f in MOCK_DATA["facilities"]:
+                if f["id"] == facility_id:
+                    # simplistic update - we don't parse the query fully, 
+                    # but we know what update_facility passes
+                    # This is a bit fragile but works for the specific usage in update_facility
+                    if len(args) > 1 and "image_url" in query:
+                        # Assuming the first arg is image_url or ai_analysis depending on query
+                        # This mock is very specific to the current usage
+                        pass 
+                    f["updated_at"] = datetime.now()
+                    break
+
+    async def fetch(self, query, *args):
+        # Mock query logic
+        results = []
+        if "FROM facilities" in query:
+            # Simple radius check mock
+            lat = args[0]
+            lng = args[1]
+            radius = args[2]
+            
+            for f in MOCK_DATA["facilities"]:
+                # Simple distance calc (Euclidean approximation for mock)
+                # In real app PostGIS does this
+                dist = ((f["latitude"] - lat)**2 + (f["longitude"] - lng)**2)**0.5 * 111000
+                if dist <= radius:
+                    f_copy = f.copy()
+                    f_copy["distance"] = dist
+                    results.append(MockRecord(f_copy))
+                    
+        elif "FROM rewards" in query:
+            wallet = args[0]
+            for r in MOCK_DATA["rewards"]:
+                if r["wallet_address"] == wallet:
+                    # Join facility info
+                    r_copy = r.copy()
+                    fac = next((f for f in MOCK_DATA["facilities"] if f["id"] == r["facility_id"]), None)
+                    if fac:
+                        r_copy["facility_type"] = fac["type"]
+                    results.append(MockRecord(r_copy))
+                    
+        return results
+
+    async def fetchrow(self, query, *args):
+        if "FROM facilities" in query and "LIMIT 1" in query:
+            # check_existing mock
+            # args: facility_type, lng, lat
+            if len(args) >= 3:
+                f_type = args[0]
+                lng = args[1]
+                lat = args[2]
+                for f in MOCK_DATA["facilities"]:
+                    if f["type"] == f_type:
+                        dist = ((f["latitude"] - lat)**2 + (f["longitude"] - lng)**2)**0.5 * 111000
+                        if dist < 50: # 50m check
+                            res = f.copy()
+                            res["days_since_update"] = (datetime.now() - f["updated_at"]).days
+                            return MockRecord(res)
+                            
+        if "FROM facilities" in query and "WHERE id =" in query:
+            # get_facility_by_id
+            f_id = args[0]
+            for f in MOCK_DATA["facilities"]:
+                if f["id"] == f_id:
+                    return MockRecord(f)
+
+        if "SELECT COALESCE(SUM(amount), 0)" in query:
+            wallet = args[0]
+            total = sum(r["amount"] for r in MOCK_DATA["rewards"] if r["wallet_address"] == wallet)
+            return total
+            
+        return None
+
+    async def fetchval(self, query, *args):
+        row = await self.fetchrow(query, *args)
+        if row is not None and not isinstance(row, MockRecord):
+            return row
+        return None
+
+
+class MockPool:
+    """Mock database pool."""
+    def acquire(self):
+        return self
+
+    async def __aenter__(self):
+        return MockConnection()
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    async def close(self):
+        pass
 
 
 class DatabasePool:
@@ -54,8 +176,11 @@ class DatabasePool:
     _pool: Optional[asyncpg.Pool] = None
 
     @classmethod
-    async def get_pool(cls) -> asyncpg.Pool:
+    async def get_pool(cls):
         """Get or create the connection pool."""
+        if MOCK_DATABASE:
+            return MockPool()
+            
         if cls._pool is None:
             import ssl
             ssl_context = ssl.create_default_context()
@@ -69,6 +194,7 @@ class DatabasePool:
                 ssl=ssl_context
             )
         return cls._pool
+
 
     @classmethod
     async def close(cls):

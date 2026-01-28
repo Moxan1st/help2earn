@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-import asyncpg
+from skills.database.skill import DatabasePool, MOCK_DATABASE, MOCK_DATA
 
 logger = logging.getLogger(__name__)
 
@@ -82,11 +82,37 @@ async def check_fraud(lat: float, lng: float, facility_type: str) -> dict:
         - existing_facility_id: ID of existing facility if found
     """
     try:
-        import ssl
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5, ssl=ssl_context)
+        if MOCK_DATABASE:
+            # Mock logic for fraud check
+            for f in MOCK_DATA["facilities"]:
+                if f["type"] == facility_type:
+                    # Simple distance check
+                    dist = ((f["latitude"] - lat)**2 + (f["longitude"] - lng)**2)**0.5 * 111000
+                    if dist <= DUPLICATE_RADIUS_METERS:
+                        days_since = (datetime.now() - f["updated_at"]).days
+                        if days_since < DUPLICATE_WINDOW_DAYS:
+                            return FraudCheckResult(
+                                is_fraud=True,
+                                reward_amount=0,
+                                reason=f"duplicate_within_{DUPLICATE_WINDOW_DAYS}_days",
+                                existing_facility_id=f["id"]
+                            ).to_dict()
+                        else:
+                            return FraudCheckResult(
+                                is_fraud=False,
+                                reward_amount=UPDATE_FACILITY_REWARD,
+                                reason="facility_update",
+                                existing_facility_id=f["id"]
+                            ).to_dict()
+            
+            # No duplicate found
+            return FraudCheckResult(
+                is_fraud=False,
+                reward_amount=NEW_FACILITY_REWARD,
+                reason="new_facility"
+            ).to_dict()
+
+        pool = await DatabasePool.get_pool()
 
         async with pool.acquire() as conn:
             # Check for existing facilities within radius
@@ -98,8 +124,8 @@ async def check_fraud(lat: float, lng: float, facility_type: str) -> dict:
                     updated_at,
                     EXTRACT(DAY FROM NOW() - updated_at) as days_since_update,
                     ST_Distance(
-                        location,
-                        ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
+                    location,
+                    ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
                     ) as distance
                 FROM facilities
                 WHERE type = $3
@@ -111,8 +137,6 @@ async def check_fraud(lat: float, lng: float, facility_type: str) -> dict:
                 ORDER BY distance ASC
                 LIMIT 1
             """, lat, lng, facility_type, DUPLICATE_RADIUS_METERS)
-
-        await pool.close()
 
         if row is None:
             # No existing facility - this is a new submission
@@ -178,30 +202,35 @@ async def check_user_submission_rate(wallet_address: str) -> dict:
         dict with rate check results
     """
     try:
-        import ssl
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5, ssl=ssl_context)
+        if MOCK_DATABASE:
+            hourly_count = 0
+            daily_count = 0
+            now = datetime.now()
+            for f in MOCK_DATA["facilities"]:
+                if f["contributor_address"] == wallet_address:
+                    if (now - f["created_at"]).total_seconds() < 3600:
+                        hourly_count += 1
+                    if (now - f["created_at"]).total_seconds() < 86400:
+                        daily_count += 1
+        else:
+            pool = await DatabasePool.get_pool()
 
-        async with pool.acquire() as conn:
-            # Check hourly rate
-            hourly_count = await conn.fetchval("""
-                SELECT COUNT(*)
-                FROM facilities
-                WHERE contributor_address = $1
-                AND created_at > NOW() - INTERVAL '1 hour'
-            """, wallet_address)
+            async with pool.acquire() as conn:
+                # Check hourly rate
+                hourly_count = await conn.fetchval("""
+                    SELECT COUNT(*)
+                    FROM facilities
+                    WHERE contributor_address = $1
+                    AND created_at > NOW() - INTERVAL '1 hour'
+                """, wallet_address)
 
-            # Check daily rate
-            daily_count = await conn.fetchval("""
-                SELECT COUNT(*)
-                FROM facilities
-                WHERE contributor_address = $1
-                AND created_at > NOW() - INTERVAL '1 day'
-            """, wallet_address)
-
-        await pool.close()
+                # Check daily rate
+                daily_count = await conn.fetchval("""
+                    SELECT COUNT(*)
+                    FROM facilities
+                    WHERE contributor_address = $1
+                    AND created_at > NOW() - INTERVAL '1 day'
+                """, wallet_address)
 
         max_hourly = 10
         max_daily = 50
@@ -299,11 +328,27 @@ async def get_fraud_statistics(wallet_address: Optional[str] = None) -> dict:
         dict with fraud statistics
     """
     try:
-        import ssl
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5, ssl=ssl_context)
+        if MOCK_DATABASE:
+            total = len(MOCK_DATA["facilities"])
+            unique = len(set(f["contributor_address"] for f in MOCK_DATA["facilities"]))
+            new_fac = 0
+            updates = 0
+            for f in MOCK_DATA["facilities"]:
+                if wallet_address and f["contributor_address"] != wallet_address:
+                    continue
+                if f["created_at"] == f["updated_at"]:
+                    new_fac += 1
+                else:
+                    updates += 1
+            
+            return {
+                "total_submissions": new_fac + updates,
+                "new_facilities": new_fac,
+                "updates": updates,
+                "unique_contributors": unique
+            }
+
+        pool = await DatabasePool.get_pool()
 
         async with pool.acquire() as conn:
             if wallet_address:
@@ -324,8 +369,6 @@ async def get_fraud_statistics(wallet_address: Optional[str] = None) -> dict:
                         COUNT(CASE WHEN created_at != updated_at THEN 1 END) as updates
                     FROM facilities
                 """)
-
-        await pool.close()
 
         return {
             "total_submissions": stats["total_submissions"],

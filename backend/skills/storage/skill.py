@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 GCS_PROJECT_ID = os.getenv("GCS_PROJECT_ID", "")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "help2earn-images")
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+MOCK_STORAGE = os.getenv("MOCK_STORAGE", "false").lower() == "true"
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
 
 class GCSClient:
@@ -32,6 +34,9 @@ class GCSClient:
     @classmethod
     def get_client(cls) -> storage.Client:
         """Get or create the GCS client."""
+        if MOCK_STORAGE:
+            return None
+            
         if cls._client is None:
             if CREDENTIALS_PATH and os.path.exists(CREDENTIALS_PATH):
                 credentials = service_account.Credentials.from_service_account_file(
@@ -49,6 +54,9 @@ class GCSClient:
     @classmethod
     def get_bucket(cls) -> storage.Bucket:
         """Get the storage bucket."""
+        if MOCK_STORAGE:
+            return None
+            
         if cls._bucket is None:
             client = cls.get_client()
             cls._bucket = client.bucket(GCS_BUCKET_NAME)
@@ -75,11 +83,37 @@ async def upload_image(
         - blob_name: Name of the blob in GCS
     """
     try:
-        bucket = GCSClient.get_bucket()
-
         # Generate unique filename
         file_id = str(uuid.uuid4())
         extension = "jpg" if "jpeg" in content_type else content_type.split("/")[-1]
+        
+        if MOCK_STORAGE:
+            # Local storage logic
+            blob_name = f"facilities/{facility_type}/{file_id}.{extension}"
+            
+            # Ensure directory exists
+            os.makedirs(os.path.join(UPLOAD_DIR, "facilities", facility_type), exist_ok=True)
+            
+            # Write file
+            file_path = os.path.join(UPLOAD_DIR, blob_name)
+            with open(file_path, "wb") as f:
+                f.write(image_data)
+                
+            # Construct local URL (assuming backend serves uploads)
+            # This requires backend to mount static files
+            api_url = os.getenv("NEXT_PUBLIC_API_URL", "http://localhost:8000")
+            url = f"{api_url}/uploads/{blob_name}"
+            
+            logger.info(f"Image saved locally: {file_path}")
+            
+            return {
+                "success": True,
+                "url": url,
+                "blob_name": blob_name
+            }
+        
+        bucket = GCSClient.get_bucket()
+
         blob_name = f"facilities/{facility_type}/{file_id}.{extension}"
 
         # Create blob and upload

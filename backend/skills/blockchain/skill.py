@@ -24,6 +24,7 @@ SEPOLIA_RPC_URL = os.getenv(
 PRIVATE_KEY = os.getenv("MINTER_PRIVATE_KEY", "")
 TOKEN_CONTRACT_ADDRESS = os.getenv("TOKEN_CONTRACT_ADDRESS", "")
 DISTRIBUTOR_CONTRACT_ADDRESS = os.getenv("DISTRIBUTOR_CONTRACT_ADDRESS", "")
+MOCK_BLOCKCHAIN = os.getenv("MOCK_BLOCKCHAIN", "false").lower() == "true"
 
 # ERC-20 Token ABI (minimal for minting)
 TOKEN_ABI = [
@@ -76,10 +77,72 @@ DISTRIBUTOR_ABI = [
 ]
 
 
+class MockContractFunction:
+    def __init__(self, name):
+        self.name = name
+    
+    def call(self, *args, **kwargs):
+        if self.name == "decimals":
+            return 18
+        if self.name == "balanceOf":
+            return 100 * 10**18
+        if self.name == "verificationRecords":
+            return False
+        return None
+
+    def build_transaction(self, *args, **kwargs):
+        return {"to": "0x00", "data": "0x"}
+
+class MockContract:
+    def __init__(self, functions):
+        self.functions = functions
+
+class MockFunctions:
+    def __getattr__(self, name):
+        return MockContractFunction(name)
+
+class MockWeb3:
+    def is_connected(self):
+        return True
+    
+    class eth:
+        gas_price = 1000000000
+        
+        @staticmethod
+        def get_transaction_count(address):
+            return 0
+            
+        class account:
+            address = "0x0000000000000000000000000000000000000000"
+            
+            @staticmethod
+            def sign_transaction(tx, private_key):
+                class SignedTx:
+                    raw_transaction = b"mock"
+                return SignedTx()
+                
+        @staticmethod
+        def send_raw_transaction(raw_tx):
+            return b"0x" + b"0"*64
+            
+        @staticmethod
+        def wait_for_transaction_receipt(tx_hash, timeout=120):
+            class Receipt:
+                status = 1
+            return Receipt()
+
+
 class BlockchainClient:
     """Web3 client for blockchain operations."""
 
     def __init__(self):
+        if MOCK_BLOCKCHAIN:
+            self.w3 = MockWeb3()
+            self.account = MockWeb3.eth.account
+            self.token = MockContract(MockFunctions())
+            self.distributor = MockContract(MockFunctions())
+            return
+
         self.w3 = Web3(Web3.HTTPProvider(SEPOLIA_RPC_URL))
 
         if PRIVATE_KEY:
@@ -106,6 +169,9 @@ class BlockchainClient:
 
     def is_configured(self) -> bool:
         """Check if blockchain client is properly configured."""
+        if MOCK_BLOCKCHAIN:
+            return True
+            
         return all([
             self.w3.is_connected(),
             self.account is not None,
@@ -140,6 +206,13 @@ async def send_reward(wallet: str, amount: int) -> str:
         str: Transaction hash
     """
     client = get_client()
+    
+    if MOCK_BLOCKCHAIN:
+        import hashlib
+        logger.info(f"[MOCK] Sending reward: {amount} tokens to {wallet}")
+        # Generate a fake hash
+        fake_hash = "0x" + hashlib.sha256(f"{wallet}{amount}".encode()).hexdigest()
+        return fake_hash
 
     if not client.is_configured():
         logger.error("Blockchain client not configured")
