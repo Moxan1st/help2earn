@@ -74,7 +74,7 @@ export function CameraButton({ userLocation, walletAddress, onSuccess }: CameraB
         // Create facility object for map
         const newFacility: Facility = {
           id: result.facility_id,
-          type: result.facility_type || 'ramp',
+          type: (result.facility_type || 'ramp') as 'ramp' | 'toilet' | 'elevator' | 'wheelchair',
           latitude: userLocation.lat,
           longitude: userLocation.lng,
           image_url: previewUrl || '',
