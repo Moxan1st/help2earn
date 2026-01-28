@@ -97,6 +97,13 @@ async def analyze_image(image: bytes) -> dict:
             os.environ["GRPC_PROXY"] = proxy
             logger.info(f"Using proxy for Gemini API: {proxy}")
 
+        # Configure Gemini API key
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+        else:
+            logger.warning("GEMINI_API_KEY not set, using default credentials")
+
         # Configure Gemini
         model = genai.GenerativeModel('gemini-2.0-flash')
 
