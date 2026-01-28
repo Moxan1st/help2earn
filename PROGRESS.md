@@ -331,3 +331,43 @@ HTTPS_PROXY=http://127.0.0.1:7890
 ```
 
 *更新时间: 2026-01-29 01:30*
+
+---
+
+## 2026-01-29 02:30 部署完成 & 待办任务
+
+### 部署状态 ✅
+
+| 服务 | 平台 | URL | 状态 |
+|------|------|-----|------|
+| 前端 | Vercel | 已部署 | Live |
+| 后端 | Render | `https://help2earn-api.onrender.com` | Live |
+
+### 最新修复
+- Vision skill: 添加 `genai.configure(api_key=...)` 配置 Gemini API Key
+- 前端 TypeScript: facility_type 类型断言
+- 前端: Leaflet CSS 导入 ts-ignore
+
+### 待修复问题
+
+1. **UI - Facility Types 标尺**
+   - 字体白色在白色底看不清
+   - 需要使用对应的 facility 形状图标
+
+2. **地图不显示已上传的 Facility**
+   - 需要从 API 获取并渲染 facilities
+   - 图标大小比地图自带图标大 2 倍
+   - 图标大小不随地图缩放变化
+
+3. **上链行为确认**
+   - 需要检查交易是否正确上链
+   - 验证 RewardDistributor 合约调用
+
+4. **照片真实性验证系统（新功能规划）**
+   - AI 判断真实性
+   - 真实 → 双倍代币
+   - 虚假 → 扣除代币 + 禁止上传
+   - 其他用户质疑机制
+   - 考虑引入区块链预言机
+
+*更新时间: 2026-01-29 02:30*
