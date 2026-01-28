@@ -15,7 +15,7 @@ web3>=7.0.0
 eth-account>=0.11.0
 
 # Image processing
-Pillow==10.2.0
+Pillow>=10.4.0
 
 # Data validation
 pydantic==2.5.3
