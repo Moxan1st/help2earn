@@ -38,6 +38,7 @@ export default function Map({ center, facilities, onFacilityClick }: MapProps) {
   useEffect(() => {
     const loadLeaflet = async () => {
       const L = (await import('leaflet')).default;
+      // @ts-ignore - CSS import doesn't have types
       await import('leaflet/dist/leaflet.css');
       setLeaflet(L);
     };
