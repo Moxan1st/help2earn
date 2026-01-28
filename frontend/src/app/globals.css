@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 255, 255, 255;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 10, 10, 10;
+    --background-end-rgb: 10, 10, 10;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+  z-index: 0 !important;
+}
+
+.leaflet-pane {
+  z-index: 1 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 5 !important;
+}
+
+.leaflet-control-attribution {
+  font-size: 10px;
+}
+
+/* Fix Leaflet default marker icon issue */
+.leaflet-default-icon-path {
+  background-image: url('https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png');
+}
+
+/* Custom marker styles */
+.facility-marker {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.facility-marker:hover {
+  transform: scale(1.1);
+}
+
+.facility-marker.ramp {
+  background-color: #3B82F6;
+}
+
+.facility-marker.toilet {
+  background-color: #8B5CF6;
+}
+
+.facility-marker.elevator {
+  background-color: #F59E0B;
+}
+
+.facility-marker.wheelchair {
+  background-color: #10B981;
+}
+
+/* PWA styles */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Camera button pulse animation */
+@keyframes camera-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 15px rgba(34, 197, 94, 0);
+  }
+}
+
+.camera-button-pulse {
+  animation: camera-pulse 2s infinite;
+}
+
+/* Loading spinner */
+.spinner {
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Facility popup */
+.facility-popup {
+  max-width: 280px;
+}
+
+.facility-popup img {
+  border-radius: 8px;
+  object-fit: cover;
+}
