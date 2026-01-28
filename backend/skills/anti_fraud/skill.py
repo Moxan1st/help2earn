@@ -1,67 +1,191 @@
-"""Anti-Fraud Skill - Duplicate and fraud detection."""
+"""
+Anti-Fraud Skill - Duplicate and fraud detection
 
-import logging
-from datetime import datetime
-from typing import Optional, Dict, Any
+Handles all anti-fraud operations including:
+- Checking for duplicate submissions
+- Detecting suspicious patterns
+- Determining appropriate reward amounts
+"""
+
 import os
+import logging
+from datetime import datetime, timedelta
+from typing import Optional
 
-from skills.database.skill import check_existing_facility, SupabaseManager, MOCK_DATABASE, MOCK_DATA
+from skills.database.skill import DatabasePool, MOCK_DATABASE, MOCK_DATA
 
 logger = logging.getLogger(__name__)
 
-async def check_fraud(lat: float, lng: float, type: str) -> dict:
+# Database connection settings
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/help2earn"
+)
+
+# Anti-fraud configuration
+DUPLICATE_RADIUS_METERS = 50  # Same facility if within 50m
+DUPLICATE_WINDOW_DAYS = 15    # Consider duplicate if within 15 days
+NEW_FACILITY_REWARD = 50      # Tokens for new facility
+UPDATE_FACILITY_REWARD = 25   # Tokens for updating existing facility
+
+
+class FraudCheckResult:
+    """Result of fraud check."""
+    def __init__(
+        self,
+        is_fraud: bool,
+        reward_amount: int,
+        reason: str,
+        existing_facility_id: Optional[str] = None
+    ):
+        self.is_fraud = is_fraud
+        self.reward_amount = reward_amount
+        self.reason = reason
+        self.existing_facility_id = existing_facility_id
+
+    def to_dict(self) -> dict:
+        return {
+            "is_fraud": self.is_fraud,
+            "reward_amount": self.reward_amount,
+            "reason": self.reason,
+            "existing_facility_id": self.existing_facility_id
+        }
+
+
+async def check_fraud(lat: float, lng: float, facility_type: str) -> dict:
     """
-    Check if a submission is potentially fraudulent or a duplicate.
-    
+    Check if a submission is potentially fraudulent.
+
+    Rules:
+    1. If same type facility exists within 50m and was updated within 15 days:
+       - Mark as duplicate (fraud)
+       - No reward
+
+    2. If same type facility exists within 50m but older than 15 days:
+       - Mark as update
+       - Reward 25 tokens
+
+    3. If no similar facility exists:
+       - Mark as new
+       - Reward 50 tokens
+
     Args:
-        lat: Latitude
-        lng: Longitude
-        type: Facility type
-        
+        lat: Latitude coordinate
+        lng: Longitude coordinate
+        facility_type: Type of facility (ramp/toilet/elevator/wheelchair)
+
     Returns:
-        dict with fraud check results
+        dict with:
+        - is_fraud: Whether this is a fraudulent submission
+        - reward_amount: Tokens to award (0 if fraud)
+        - reason: Explanation of the determination
+        - existing_facility_id: ID of existing facility if found
     """
     try:
-        # Check for existing facility nearby (50m radius)
-        existing = await check_existing_facility(type, lat, lng, 50)
-        
-        if existing:
-            # Found existing facility
-            days_since_update = existing.get("days_since_update", 0)
+        if MOCK_DATABASE:
+            # Mock logic for fraud check
+            for f in MOCK_DATA["facilities"]:
+                if f["type"] == facility_type:
+                    # Simple distance check
+                    dist = ((f["latitude"] - lat)**2 + (f["longitude"] - lng)**2)**0.5 * 111000
+                    if dist <= DUPLICATE_RADIUS_METERS:
+                        days_since = (datetime.now() - f["updated_at"]).days
+                        if days_since < DUPLICATE_WINDOW_DAYS:
+                            return FraudCheckResult(
+                                is_fraud=True,
+                                reward_amount=0,
+                                reason=f"duplicate_within_{DUPLICATE_WINDOW_DAYS}_days",
+                                existing_facility_id=f["id"]
+                            ).to_dict()
+                        else:
+                            return FraudCheckResult(
+                                is_fraud=False,
+                                reward_amount=UPDATE_FACILITY_REWARD,
+                                reason="facility_update",
+                                existing_facility_id=f["id"]
+                            ).to_dict()
             
-            if days_since_update < 15:
-                # Less than 15 days: Reject as duplicate/spam
-                return {
-                    "is_fraud": True,
-                    "reason": "Facility verified recently (less than 15 days)",
-                    "existing_facility_id": existing["id"]
-                }
-            else:
-                # More than 15 days: Allow as update, but reduced reward
-                return {
-                    "is_fraud": False,
-                    "reason": "update_existing",
-                    "reward_amount": 25,
-                    "existing_facility_id": existing["id"]
-                }
-        
-        # No existing facility: New submission
-        return {
-            "is_fraud": False,
-            "reason": "new_facility",
-            "reward_amount": 50,
-            "existing_facility_id": None
-        }
-        
+            # No duplicate found
+            return FraudCheckResult(
+                is_fraud=False,
+                reward_amount=NEW_FACILITY_REWARD,
+                reason="new_facility"
+            ).to_dict()
+
+        pool = await DatabasePool.get_pool()
+
+        async with pool.acquire() as conn:
+            # Check for existing facilities within radius
+            row = await conn.fetchrow("""
+                SELECT
+                    id, type,
+                    ST_X(location::geometry) as longitude,
+                    ST_Y(location::geometry) as latitude,
+                    updated_at,
+                    EXTRACT(DAY FROM NOW() - updated_at) as days_since_update,
+                    ST_Distance(
+                    location,
+                    ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
+                    ) as distance
+                FROM facilities
+                WHERE type = $3
+                AND ST_DWithin(
+                    location,
+                    ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography,
+                    $4
+                )
+                ORDER BY distance ASC
+                LIMIT 1
+            """, lat, lng, facility_type, DUPLICATE_RADIUS_METERS)
+
+        if row is None:
+            # No existing facility - this is a new submission
+            result = FraudCheckResult(
+                is_fraud=False,
+                reward_amount=NEW_FACILITY_REWARD,
+                reason="new_facility"
+            )
+            logger.info(f"New facility submission at ({lat}, {lng})")
+            return result.to_dict()
+
+        days_since_update = int(row["days_since_update"]) if row["days_since_update"] else 0
+
+        if days_since_update < DUPLICATE_WINDOW_DAYS:
+            # Recent submission exists - this is a duplicate
+            result = FraudCheckResult(
+                is_fraud=True,
+                reward_amount=0,
+                reason=f"duplicate_within_{DUPLICATE_WINDOW_DAYS}_days",
+                existing_facility_id=row["id"]
+            )
+            logger.warning(
+                f"Duplicate submission detected at ({lat}, {lng}), "
+                f"existing: {row['id']}, days since update: {days_since_update}"
+            )
+            return result.to_dict()
+
+        # Older submission exists - this is an update
+        result = FraudCheckResult(
+            is_fraud=False,
+            reward_amount=UPDATE_FACILITY_REWARD,
+            reason="facility_update",
+            existing_facility_id=row["id"]
+        )
+        logger.info(
+            f"Facility update at ({lat}, {lng}), "
+            f"existing: {row['id']}, days since update: {days_since_update}"
+        )
+        return result.to_dict()
+
     except Exception as e:
-        logger.error(f"Error in check_fraud: {e}")
-        # Fail safe: allow it but log error
-        return {
-            "is_fraud": False,
-            "reason": "error_bypass",
-            "reward_amount": 50,
-            "existing_facility_id": None
-        }
+        logger.error(f"Error checking fraud: {e}")
+        # On error, default to new facility to not block legitimate submissions
+        return FraudCheckResult(
+            is_fraud=False,
+            reward_amount=NEW_FACILITY_REWARD,
+            reason="check_failed_default_new"
+        ).to_dict()
+
 
 async def check_user_submission_rate(wallet_address: str) -> dict:
     """
@@ -89,57 +213,107 @@ async def check_user_submission_rate(wallet_address: str) -> dict:
                     if (now - f["created_at"]).total_seconds() < 86400:
                         daily_count += 1
         else:
-            client = SupabaseManager.get_client()
-            
-            response = client.rpc(
-                "check_user_submission_rate",
-                {"p_wallet_address": wallet_address}
-            ).execute()
-            
-            data = response.data[0] if response.data else {"hourly_count": 0, "daily_count": 0}
-            hourly_count = data["hourly_count"]
-            daily_count = data["daily_count"]
+            pool = await DatabasePool.get_pool()
 
-        is_rate_limited = False
-        reason = None
+            async with pool.acquire() as conn:
+                # Check hourly rate
+                hourly_count = await conn.fetchval("""
+                    SELECT COUNT(*)
+                    FROM facilities
+                    WHERE contributor_address = $1
+                    AND created_at > NOW() - INTERVAL '1 hour'
+                """, wallet_address)
 
-        if hourly_count >= 10:
-            is_rate_limited = True
-            reason = "hourly_limit_exceeded"
-        elif daily_count >= 50:
-            is_rate_limited = True
-            reason = "daily_limit_exceeded"
+                # Check daily rate
+                daily_count = await conn.fetchval("""
+                    SELECT COUNT(*)
+                    FROM facilities
+                    WHERE contributor_address = $1
+                    AND created_at > NOW() - INTERVAL '1 day'
+                """, wallet_address)
+
+        max_hourly = 10
+        max_daily = 50
+
+        if hourly_count >= max_hourly:
+            return {
+                "allowed": False,
+                "reason": f"Hourly limit reached ({max_hourly}/hour)",
+                "hourly_count": hourly_count,
+                "daily_count": daily_count,
+                "wait_minutes": 60
+            }
+
+        if daily_count >= max_daily:
+            return {
+                "allowed": False,
+                "reason": f"Daily limit reached ({max_daily}/day)",
+                "hourly_count": hourly_count,
+                "daily_count": daily_count,
+                "wait_minutes": 1440
+            }
 
         return {
-            "is_rate_limited": is_rate_limited,
+            "allowed": True,
+            "reason": "within_limits",
             "hourly_count": hourly_count,
             "daily_count": daily_count,
-            "reason": reason
+            "remaining_hourly": max_hourly - hourly_count,
+            "remaining_daily": max_daily - daily_count
         }
 
     except Exception as e:
         logger.error(f"Error checking submission rate: {e}")
-        return {"error": str(e), "is_rate_limited": False}
+        return {
+            "allowed": True,
+            "reason": "check_failed_default_allow"
+        }
 
 
 async def check_location_validity(lat: float, lng: float) -> dict:
     """
-    Check if location is valid (e.g. in Shanghai).
-    
+    Check if a location is valid for submission.
+
+    Checks:
+    - Coordinates are within valid ranges
+    - Location is on land (not in ocean)
+    - Location is not in restricted areas
+
     Args:
-        lat: Latitude
-        lng: Longitude
-        
+        lat: Latitude coordinate
+        lng: Longitude coordinate
+
     Returns:
-        dict with validity check
+        dict with validity check results
     """
-    # Simple bounding box for Shanghai (approximate)
-    # 30.40 - 31.53 N, 120.52 - 122.12 E
-    is_valid = (30.40 <= lat <= 31.53) and (120.52 <= lng <= 122.12)
-    
+    # Basic coordinate validation
+    if not (-90 <= lat <= 90):
+        return {
+            "valid": False,
+            "reason": "Invalid latitude (must be -90 to 90)"
+        }
+
+    if not (-180 <= lng <= 180):
+        return {
+            "valid": False,
+            "reason": "Invalid longitude (must be -180 to 180)"
+        }
+
+    # Check for obviously invalid coordinates (0,0 is in the ocean)
+    if lat == 0 and lng == 0:
+        return {
+            "valid": False,
+            "reason": "Invalid coordinates (0,0)"
+        }
+
+    # Could add more sophisticated checks here:
+    # - Reverse geocoding to verify on land
+    # - Check against known restricted areas
+    # - Verify GPS accuracy
+
     return {
-        "is_valid": is_valid,
-        "reason": "outside_service_area" if not is_valid else None
+        "valid": True,
+        "reason": "coordinates_valid"
     }
 
 
@@ -174,21 +348,33 @@ async def get_fraud_statistics(wallet_address: Optional[str] = None) -> dict:
                 "unique_contributors": unique
             }
 
-        client = SupabaseManager.get_client()
-        
-        response = client.rpc(
-            "get_fraud_stats",
-            {"p_wallet_address": wallet_address}
-        ).execute()
-        
-        if response.data and len(response.data) > 0:
-            return response.data[0]
-            
+        pool = await DatabasePool.get_pool()
+
+        async with pool.acquire() as conn:
+            if wallet_address:
+                stats = await conn.fetchrow("""
+                    SELECT
+                        COUNT(*) as total_submissions,
+                        COUNT(CASE WHEN created_at = updated_at THEN 1 END) as new_facilities,
+                        COUNT(CASE WHEN created_at != updated_at THEN 1 END) as updates
+                    FROM facilities
+                    WHERE contributor_address = $1
+                """, wallet_address)
+            else:
+                stats = await conn.fetchrow("""
+                    SELECT
+                        COUNT(*) as total_submissions,
+                        COUNT(DISTINCT contributor_address) as unique_contributors,
+                        COUNT(CASE WHEN created_at = updated_at THEN 1 END) as new_facilities,
+                        COUNT(CASE WHEN created_at != updated_at THEN 1 END) as updates
+                    FROM facilities
+                """)
+
         return {
-            "total_submissions": 0,
-            "new_facilities": 0,
-            "updates": 0,
-            "unique_contributors": 0
+            "total_submissions": stats["total_submissions"],
+            "new_facilities": stats["new_facilities"],
+            "updates": stats["updates"],
+            "unique_contributors": stats.get("unique_contributors")
         }
 
     except Exception as e:

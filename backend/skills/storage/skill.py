@@ -123,14 +123,15 @@ async def upload_image(
             content_type=content_type
         )
 
-        # Make publicly accessible (or use signed URLs for private access)
-        blob.make_public()
+        # Use direct public URL (bucket should have allUsers read access)
+        # Note: make_public() doesn't work with uniform bucket-level access
+        url = f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{blob_name}"
 
         logger.info(f"Image uploaded: {blob_name}")
 
         return {
             "success": True,
-            "url": blob.public_url,
+            "url": url,
             "blob_name": blob_name
         }
 

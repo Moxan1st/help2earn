@@ -88,6 +88,15 @@ async def analyze_image(image: bytes) -> dict:
         }
 
     try:
+        # Configure proxy for Gemini API access (needed in regions with restrictions)
+        proxy = os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")
+        if proxy:
+            # Set environment variables for underlying HTTP libraries
+            os.environ["HTTP_PROXY"] = proxy
+            os.environ["HTTPS_PROXY"] = proxy
+            os.environ["GRPC_PROXY"] = proxy
+            logger.info(f"Using proxy for Gemini API: {proxy}")
+
         # Configure Gemini
         model = genai.GenerativeModel('gemini-2.0-flash')
 

@@ -184,3 +184,150 @@ MOCK_VISION=true
 ---
 
 *更新时间: 2026-01-28 20:50*
+
+---
+
+## 2026-01-29 Mock 替换计划
+
+### Mock 模块状态
+
+| 模块 | 环境变量 | Mock 实现 | 真实服务 |
+|------|---------|----------|----------|
+| Storage | `MOCK_STORAGE` | 本地文件系统 | GCS Bucket |
+| Database | `MOCK_DATABASE` | 内存数据 | Supabase PostgreSQL |
+| Blockchain | `MOCK_BLOCKCHAIN` | 模拟 Web3 | Sepolia 合约 |
+| Vision | `MOCK_VISION` | 随机结果 | Gemini API |
+
+### 已完成的代码修改 ✅
+
+1. **Storage skill 修复** (`backend/skills/storage/skill.py`)
+   - 移除了 `blob.make_public()` 调用（与 uniform bucket-level access 不兼容）
+   - 改用直接构造公共 URL: `https://storage.googleapis.com/{bucket}/{blob}`
+
+2. **Vision skill 添加代理支持** (`backend/skills/vision/skill.py`)
+   - 添加了 `HTTPS_PROXY` 和 `HTTP_PROXY` 环境变量支持
+   - 支持通过代理访问 Gemini API
+
+3. **创建 env.example 模板** (`backend/env.example`)
+   - 包含所有 Mock 开关说明
+   - 包含所有服务配置项
+
+### 切换到真实实现的步骤
+
+#### 1. Storage (GCS)
+```bash
+# 在 .env 中设置
+MOCK_STORAGE=false
+GCS_PROJECT_ID=gen-lang-client-0334796697
+GCS_BUCKET_NAME=help2earn-images-2026-1-28
+GOOGLE_APPLICATION_CREDENTIALS=gen-lang-client-0334796697-2371a9854738.json
+```
+
+确保 GCS Bucket 权限配置：
+- 在 GCP Console 添加 `allUsers` 具有 `Storage Object Viewer` 角色
+- 或使用签名 URL（代码中已有 `get_image_url` 函数支持）
+
+#### 2. Database (Supabase)
+```bash
+# 解决网络问题：在 Clash 配置中添加绕过规则
+# rules:
+#   - DOMAIN-SUFFIX,supabase.co,DIRECT
+#   - DOMAIN-SUFFIX,supabase.net,DIRECT
+
+# 在 .env 中设置
+MOCK_DATABASE=false
+DATABASE_URL=postgresql://postgres:%5BMoxan2026**%5D@db.ljedvdsnkdrsdcgmgdwv.supabase.co:5432/postgres?sslmode=require
+```
+
+#### 3. Blockchain (Sepolia)
+```bash
+# 在 .env 中设置
+MOCK_BLOCKCHAIN=false
+SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/fkVlNh_pydNsyP9cKFg39
+TOKEN_CONTRACT_ADDRESS=0x491c88aBE3FE07dFD13e379dE44D427bA94CE4C9
+DISTRIBUTOR_CONTRACT_ADDRESS=0xDf929aD0C7f32B9E3cce6B86dEaD2ff1522EF0A4
+MINTER_PRIVATE_KEY=<你的部署钱包私钥>
+```
+
+#### 4. Vision (Gemini)
+```bash
+# 在 .env 中设置
+MOCK_VISION=false
+GEMINI_API_KEY=<你的 Gemini API Key>
+HTTPS_PROXY=http://127.0.0.1:7890  # Clash 代理端口
+```
+
+### 验证命令
+
+```bash
+# 测试数据库连接
+nc -zv db.ljedvdsnkdrsdcgmgdwv.supabase.co 5432
+
+# 启动后端
+cd /home/web3_moxpc0/help2earn/backend
+source venv/bin/activate
+uvicorn main:app --reload --port 8000
+
+# 启动前端
+cd /home/web3_moxpc0/help2earn/frontend
+npm run dev
+```
+
+*更新时间: 2026-01-29*
+
+---
+
+## 2026-01-29 01:30 Mock 替换完成
+
+### 全部模块已切换到真实实现 ✅
+
+| 模块 | 环境变量 | 真实服务 | 状态 |
+|------|---------|---------|------|
+| Database | `MOCK_DATABASE=false` | Supabase (Session Pooler) | ✅ |
+| Storage | `MOCK_STORAGE=false` | GCS Bucket | ✅ |
+| Blockchain | `MOCK_BLOCKCHAIN=false` | Sepolia Testnet | ✅ |
+| Vision | `MOCK_VISION=false` | Gemini API | ✅ |
+
+### 关键配置变更
+
+1. **数据库连接改用 Session Pooler**（解决 IPv6 问题）
+   ```
+   postgresql://postgres.ljedvdsnkdrsdcgmgdwv:***@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
+   ```
+
+2. **Storage skill 修复** - 移除 `make_public()` 调用
+
+3. **Vision skill 添加代理支持** - 支持 `HTTPS_PROXY` 环境变量
+
+4. **Database skill 添加 dotenv 加载** - 确保环境变量正确读取
+
+5. **修复 UUID 转字符串** - `get_user_rewards` 中 UUID 类型转换
+
+### 当前 .env 配置
+```bash
+# Mock 全部关闭
+MOCK_DATABASE=false
+MOCK_STORAGE=false
+MOCK_BLOCKCHAIN=false
+MOCK_VISION=false
+
+# Database (Session Pooler)
+DATABASE_URL=postgresql://postgres.ljedvdsnkdrsdcgmgdwv:***@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require
+
+# Storage
+GCS_PROJECT_ID=gen-lang-client-0334796697
+GCS_BUCKET_NAME=help2earn-images-2026-1-28
+GOOGLE_APPLICATION_CREDENTIALS=gen-lang-client-0334796697-fb33522868e1.json
+
+# Blockchain
+SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/fkVlNh_pydNsyP9cKFg39
+TOKEN_CONTRACT_ADDRESS=0x491c88aBE3FE07dFD13e379dE44D427bA94CE4C9
+DISTRIBUTOR_CONTRACT_ADDRESS=0xDf929aD0C7f32B9E3cce6B86dEaD2ff1522EF0A4
+MINTER_PRIVATE_KEY=***
+
+# Vision
+GEMINI_API_KEY=***
+HTTPS_PROXY=http://127.0.0.1:7890
+```
+
+*更新时间: 2026-01-29 01:30*

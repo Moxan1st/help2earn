@@ -18,9 +18,8 @@ from skills.database.skill import (
     save_facility,
     update_facility,
     save_reward,
-    get_facilities_nearby,
-    get_user_rewards,
-    get_total_rewards,
+    query_facilities_nearby,
+    get_user_rewards as db_get_user_rewards,
     get_facility_by_id
 )
 from skills.blockchain.skill import send_reward
@@ -98,7 +97,7 @@ class Help2EarnAgent:
 
             logger.info(f"Fraud check passed: reward={reward_amount}, existing={existing_facility_id}")
 
-            # Step 3: Saving to database
+            # Step 3: Save to database
             logger.info("Step 3: Saving to database...")
             if existing_facility_id:
                 # Update existing facility
@@ -109,14 +108,14 @@ class Help2EarnAgent:
                 facility_id = existing_facility_id
             else:
                 # Create new facility
-                facility_id = await save_facility(
-                    facility_type=facility_type,
-                    lat=lat,
-                    lng=lng,
-                    image_url=image_url or "pending",
-                    ai_analysis=json.dumps(vision_result),
-                    contributor_address=wallet
-                )
+                facility_id = await save_facility({
+                    "type": facility_type,
+                    "latitude": lat,
+                    "longitude": lng,
+                    "image_url": image_url or "pending",
+                    "ai_analysis": json.dumps(vision_result),
+                    "contributor_address": wallet
+                })
 
             logger.info(f"Facility saved: {facility_id}")
 
@@ -130,12 +129,12 @@ class Help2EarnAgent:
                 tx_hash = None
 
             # Save reward record
-            await save_reward(
-                wallet_address=wallet,
-                facility_id=facility_id,
-                amount=reward_amount,
-                tx_hash=tx_hash
-            )
+            await save_reward({
+                "wallet_address": wallet,
+                "facility_id": facility_id,
+                "amount": reward_amount,
+                "tx_hash": tx_hash
+            })
 
             return {
                 "success": True,
@@ -171,7 +170,7 @@ class Help2EarnAgent:
             dict with list of facilities
         """
         try:
-            facilities = await get_facilities_nearby(lat, lng, radius)
+            facilities = await query_facilities_nearby(lat, lng, radius)
             return {
                 "facilities": facilities,
                 "count": len(facilities)
@@ -191,13 +190,7 @@ class Help2EarnAgent:
             dict with reward history and totals
         """
         try:
-            rewards = await get_user_rewards(wallet)
-            total = await get_total_rewards(wallet)
-            return {
-                "rewards": rewards,
-                "total_earned": total,
-                "contribution_count": len(rewards)
-            }
+            return await db_get_user_rewards(wallet)
         except Exception as e:
             logger.error(f"Error getting rewards: {e}")
             return {"rewards": [], "total_earned": 0, "error": str(e)}
