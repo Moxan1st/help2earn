@@ -26,7 +26,7 @@ from models.schemas import (
     HealthCheck,
     ErrorResponse
 )
-from skills.database.skill import DatabasePool
+# from skills.database.skill import DatabasePool
 from skills.storage.skill import upload_image
 from fastapi.staticfiles import StaticFiles
 
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down Help2Earn API server...")
-    await DatabasePool.close()
+    # await DatabasePool.close()
     logger.info("Database connections closed")
 
 
