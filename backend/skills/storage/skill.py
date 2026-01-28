@@ -9,9 +9,13 @@ Handles image storage operations:
 
 import os
 import uuid
+import json
 import logging
 from datetime import timedelta
 from typing import Optional
+
+from dotenv import load_dotenv
+load_dotenv()
 
 from google.cloud import storage
 from google.oauth2 import service_account
@@ -22,6 +26,7 @@ logger = logging.getLogger(__name__)
 GCS_PROJECT_ID = os.getenv("GCS_PROJECT_ID", "")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "help2earn-images")
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON", "")  # JSON string for cloud deployment
 MOCK_STORAGE = os.getenv("MOCK_STORAGE", "false").lower() == "true"
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
@@ -36,9 +41,25 @@ class GCSClient:
         """Get or create the GCS client."""
         if MOCK_STORAGE:
             return None
-            
+
         if cls._client is None:
-            if CREDENTIALS_PATH and os.path.exists(CREDENTIALS_PATH):
+            # Try JSON string from environment variable first (for cloud deployment)
+            if CREDENTIALS_JSON:
+                try:
+                    credentials_info = json.loads(CREDENTIALS_JSON)
+                    credentials = service_account.Credentials.from_service_account_info(
+                        credentials_info
+                    )
+                    cls._client = storage.Client(
+                        project=GCS_PROJECT_ID,
+                        credentials=credentials
+                    )
+                    logger.info("GCS client initialized from GOOGLE_CREDENTIALS_JSON")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse GOOGLE_CREDENTIALS_JSON: {e}")
+                    raise
+            # Try file path
+            elif CREDENTIALS_PATH and os.path.exists(CREDENTIALS_PATH):
                 credentials = service_account.Credentials.from_service_account_file(
                     CREDENTIALS_PATH
                 )
@@ -46,9 +67,11 @@ class GCSClient:
                     project=GCS_PROJECT_ID,
                     credentials=credentials
                 )
+                logger.info("GCS client initialized from file")
             else:
                 # Use default credentials (for Cloud Run, GCE, etc.)
                 cls._client = storage.Client(project=GCS_PROJECT_ID)
+                logger.info("GCS client initialized with default credentials")
         return cls._client
 
     @classmethod
