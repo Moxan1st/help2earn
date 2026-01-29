@@ -54,26 +54,26 @@ export function RewardsPanel({ walletAddress, onClose }: RewardsPanelProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <>
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 modal-backdrop"
+        className="fixed inset-0 z-[150]"
         onClick={onClose}
       />
 
-      {/* Panel content */}
-      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md sm:mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+      {/* Panel content - positioned below wallet button */}
+      <div className="fixed top-16 right-4 z-[151] bg-white rounded-xl shadow-2xl w-80 max-h-[70vh] overflow-hidden flex flex-col border border-gray-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-3 border-b bg-amber-50">
           <div className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-amber-500" />
-            <h2 className="text-lg font-semibold">My Rewards</h2>
+            <Trophy className="w-5 h-5 text-amber-600" />
+            <h2 className="text-base font-semibold text-gray-800">My Rewards</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-full"
+            className="p-1 hover:bg-amber-100 rounded-full"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 text-gray-600" />
           </button>
         </div>
 
@@ -96,17 +96,17 @@ export function RewardsPanel({ walletAddress, onClose }: RewardsPanelProps) {
           ) : rewards ? (
             <>
               {/* Summary */}
-              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-white rounded-lg p-3 shadow-sm">
+              <div className="p-3 bg-gray-50 border-b">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white rounded-lg p-2 border border-gray-200">
                     <div className="text-xs text-gray-500">Total Earned</div>
-                    <div className="text-2xl font-bold text-amber-600">
-                      {rewards.total_earned} <span className="text-sm">H2E</span>
+                    <div className="text-xl font-bold text-amber-600">
+                      {rewards.total_earned} <span className="text-xs text-amber-500">H2E</span>
                     </div>
                   </div>
-                  <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <div className="bg-white rounded-lg p-2 border border-gray-200">
                     <div className="text-xs text-gray-500">Contributions</div>
-                    <div className="text-2xl font-bold text-primary-600">
+                    <div className="text-xl font-bold text-blue-600">
                       {rewards.contribution_count}
                     </div>
                   </div>
@@ -114,32 +114,32 @@ export function RewardsPanel({ walletAddress, onClose }: RewardsPanelProps) {
               </div>
 
               {/* Rewards list */}
-              <div className="p-4">
-                <h3 className="text-sm font-medium text-gray-500 mb-3">
+              <div className="p-3">
+                <h3 className="text-xs font-medium text-gray-600 mb-2">
                   Recent Rewards
                 </h3>
 
                 {rewards.rewards.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    No rewards yet. Upload accessibility facilities to earn tokens!
+                  <div className="text-center py-6 text-gray-600 text-sm">
+                    No rewards yet. Upload facilities to earn tokens!
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {rewards.rewards.map((reward: RewardRecord) => (
                       <div
                         key={reward.id}
-                        className="bg-gray-50 rounded-lg p-3 flex items-center justify-between"
+                        className="bg-white border border-gray-200 rounded-lg p-2 flex items-center justify-between"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <div
-                            className={`w-10 h-10 rounded-full ${
+                            className={`w-8 h-8 rounded-full ${
                               FACILITY_COLORS[reward.facility_type || 'ramp']
-                            } flex items-center justify-center text-white font-bold`}
+                            } flex items-center justify-center text-white text-sm font-bold`}
                           >
                             +{reward.amount}
                           </div>
                           <div>
-                            <div className="font-medium text-sm">
+                            <div className="font-medium text-sm text-gray-800">
                               {reward.facility_type
                                 ? reward.facility_type.charAt(0).toUpperCase() +
                                   reward.facility_type.slice(1)
@@ -173,12 +173,12 @@ export function RewardsPanel({ walletAddress, onClose }: RewardsPanelProps) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t bg-gray-50">
+        <div className="p-2 border-t bg-gray-50">
           <div className="text-xs text-gray-500 text-center">
-            H2E tokens are on Sepolia testnet
+            H2E tokens on Sepolia testnet
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
