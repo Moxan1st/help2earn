@@ -354,10 +354,9 @@ HTTPS_PROXY=http://127.0.0.1:7890
    - 字体白色在白色底看不清
    - 需要使用对应的 facility 形状图标
 
-2. **地图不显示已上传的 Facility**
-   - 需要从 API 获取并渲染 facilities
-   - 图标大小比地图自带图标大 2 倍
-   - 图标大小不随地图缩放变化
+2. ~~**地图不显示已上传的 Facility**~~ ✅ 已修复
+   - 修复了 `query_facilities_nearby` 中缺少 `WHERE` 关键字的 SQL 语法错误
+   - 图标大小 36px，不随地图缩放变化（Leaflet divIcon 正常行为）
 
 3. **上链行为确认**
    - 需要检查交易是否正确上链
