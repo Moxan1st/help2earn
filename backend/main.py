@@ -309,6 +309,7 @@ async def debug_blockchain():
     """Debug endpoint to check blockchain configuration."""
     import os
     from skills.blockchain.skill import get_client, MOCK_BLOCKCHAIN
+    from web3 import Web3
 
     client = get_client()
 
@@ -337,6 +338,41 @@ async def debug_blockchain():
             result["rpc_connected"] = connected
             if connected:
                 result["chain_id"] = client.w3.eth.chain_id
+
+                # Check if minter wallet is authorized caller on distributor
+                if client.distributor and client.account:
+                    auth_abi = [{
+                        "inputs": [{"name": "", "type": "address"}],
+                        "name": "authorizedCallers",
+                        "outputs": [{"name": "", "type": "bool"}],
+                        "stateMutability": "view",
+                        "type": "function"
+                    }]
+                    dist_addr = os.getenv("DISTRIBUTOR_CONTRACT_ADDRESS")
+                    dist = client.w3.eth.contract(
+                        address=Web3.to_checksum_address(dist_addr),
+                        abi=auth_abi
+                    )
+                    is_authorized = dist.functions.authorizedCallers(client.account.address).call()
+                    result["is_authorized_caller"] = is_authorized
+
+                # Check who is the current minter on token
+                if client.token:
+                    minter_abi = [{
+                        "inputs": [],
+                        "name": "minter",
+                        "outputs": [{"name": "", "type": "address"}],
+                        "stateMutability": "view",
+                        "type": "function"
+                    }]
+                    token_addr = os.getenv("TOKEN_CONTRACT_ADDRESS")
+                    token = client.w3.eth.contract(
+                        address=Web3.to_checksum_address(token_addr),
+                        abi=minter_abi
+                    )
+                    current_minter = token.functions.minter().call()
+                    result["token_minter"] = current_minter
+                    result["distributor_is_minter"] = current_minter.lower() == dist_addr.lower()
         except Exception as e:
             result["rpc_error"] = str(e)
 
