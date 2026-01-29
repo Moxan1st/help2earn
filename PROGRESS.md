@@ -372,3 +372,64 @@ HTTPS_PROXY=http://127.0.0.1:7890
    - 考虑引入区块链预言机
 
 *更新时间: 2026-01-29 02:30*
+
+---
+
+## 2026-01-29 16:00 UI 优化 & 功能增强
+
+### 已完成 ✅
+
+#### 1. UI 布局优化
+- **Facility Types** 移到左上角 Logo 下方
+- **My Rewards** 按钮移到钱包下方，添加文字标签
+- **统一字体样式**: `text-sm font-semibold text-gray-800`
+- **地图缩放控件** 移到右下角，避免被钱包遮挡
+- **RewardsPanel** 改为下拉面板样式，改善颜色对比度
+
+#### 2. 图标优化
+- 使用完整版 SVG 图标（包含人物细节）
+- 修复 elevator 和 toilet marker 丢失细节问题
+- 移除 SVG 水印
+
+#### 3. 数据库修复
+- 修复 `query_facilities_nearby` 缺少 `WHERE` 关键字
+- 修复 UUID 转字符串问题
+- 修复 `facility_id` 可为空的 schema 问题
+
+#### 4. 区块链集成
+- 修改 agent 使用 `distribute_reward_with_hash` 通过 RewardDistributor 发放奖励
+- 生成 location hash 用于链上防重复提交
+
+#### 5. Vision API 优化
+- 添加 429 错误重试逻辑（指数退避）
+- 默认使用 `gemini-1.5-flash` 模型（更稳定）
+- 支持 `GEMINI_MODEL` 环境变量自定义模型
+
+#### 6. 地图动态加载
+- 缩放/移动地图时自动加载可见区域内的设施
+- 500ms 防抖避免频繁 API 请求
+- 半径上限 5000m（后端 API 限制）
+
+#### 7. PWA 支持
+- 添加 `manifest.json` 和 `favicon.svg`
+- 修复 `.gitignore` 中 `*.json` 规则导致 manifest 被忽略
+
+### 当前部署状态
+
+| 服务 | 平台 | URL |
+|------|------|-----|
+| 前端 | Vercel | https://help2earn-tau.vercel.app |
+| 后端 | Render | https://help2earn-api.onrender.com |
+
+### 待办事项 📋
+
+1. **照片真实性验证系统**
+   - AI 判断真实性
+   - 真实 → 双倍代币
+   - 虚假 → 扣除代币 + 禁止上传
+
+2. **测试上链功能**
+   - 确认 RewardDistributor 正常工作
+   - 验证 tx_hash 正确返回
+
+*更新时间: 2026-01-29 16:00*
