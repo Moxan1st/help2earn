@@ -10,11 +10,6 @@ export const metadata: Metadata = {
   title: 'Help2Earn - 无障碍设施数据平台',
   description: '通过拍照上传无障碍设施获得代币奖励，为轮椅使用者提供精准信息服务',
   manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'Help2Earn',
-  },
 };
 
 export const viewport: Viewport = {
@@ -33,8 +28,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <head>
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </head>
       <body className={inter.className}>
         <Web3Provider>
