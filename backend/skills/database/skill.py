@@ -381,7 +381,7 @@ async def query_facilities_nearby(
                         image_url, ai_analysis, contributor_address,
                         created_at, updated_at
                     FROM facilities
-                    ST_DWithin(
+                    WHERE ST_DWithin(
                         location,
                         ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography,
                         $3
