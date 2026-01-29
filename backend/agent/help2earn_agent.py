@@ -121,20 +121,25 @@ class Help2EarnAgent:
 
             # Step 4: Send reward via RewardDistributor
             logger.info("Step 4: Sending reward...")
+            tx_hash = None
+            blockchain_error = None
             try:
                 # Generate location hash for on-chain verification
                 location_hash = generate_location_hash(lat, lng, facility_type)
+                logger.info(f"Location hash: {location_hash.hex()}")
                 tx_hash = await distribute_reward_with_hash(wallet, location_hash, reward_amount)
-                logger.info(f"Reward sent: {reward_amount} tokens, tx={tx_hash}")
+                logger.info(f"Reward sent via distributor: {reward_amount} tokens, tx={tx_hash}")
             except Exception as e:
-                logger.error(f"Reward sending failed: {e}")
+                blockchain_error = f"Distributor failed: {str(e)}"
+                logger.error(blockchain_error)
                 # Fallback to direct mint if distributor fails
                 try:
                     tx_hash = await send_reward(wallet, reward_amount)
                     logger.info(f"Fallback reward sent: {reward_amount} tokens, tx={tx_hash}")
+                    blockchain_error = None  # Clear error if fallback succeeded
                 except Exception as e2:
-                    logger.error(f"Fallback also failed: {e2}")
-                    tx_hash = None
+                    blockchain_error = f"Both methods failed. Distributor: {str(e)}, Direct mint: {str(e2)}"
+                    logger.error(blockchain_error)
 
             # Save reward record
             await save_reward({
@@ -150,7 +155,8 @@ class Help2EarnAgent:
                 "facility_type": facility_type,
                 "condition": condition,
                 "reward_amount": reward_amount,
-                "tx_hash": tx_hash
+                "tx_hash": tx_hash,
+                "blockchain_error": blockchain_error
             }
 
         except Exception as e:

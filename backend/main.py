@@ -180,7 +180,8 @@ async def upload_facility(
             condition=result.get("condition"),
             reward_amount=result.get("reward_amount"),
             tx_hash=result.get("tx_hash"),
-            reason=result.get("reason")
+            reason=result.get("reason"),
+            blockchain_error=result.get("blockchain_error")
         )
 
     except HTTPException:

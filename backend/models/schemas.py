@@ -62,6 +62,7 @@ class UploadResponse(BaseModel):
     reward_amount: Optional[int] = None
     tx_hash: Optional[str] = None
     reason: Optional[str] = None
+    blockchain_error: Optional[str] = None
 
 
 # ============ Reward Schemas ============
