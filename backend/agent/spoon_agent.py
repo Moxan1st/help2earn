@@ -4,7 +4,7 @@ Help2Earn SpoonOS Agent - ReAct Agent implementation using SpoonOS SCDF framewor
 This agent uses the SpoonOS ReAct pattern to process accessibility facility uploads
 by orchestrating tools through an LLM-driven decision loop.
 
-Uses Gemini as the LLM provider.
+Uses Gemini as the LLM provider via ChatBot.
 """
 
 import base64
@@ -13,23 +13,31 @@ import logging
 import os
 from typing import Optional
 
-from spoon_ai.llm import LLMManager, ConfigurationManager
-from spoon_ai.agents import SpoonReactAgent
-from spoon_ai.llm.gemini import GeminiProvider
+from spoon_ai import ChatBot
+from spoon_ai.agents import SpoonReactAI
+from spoon_ai.tools import ToolManager
 
-# Import tools
-from tools.vision_tool import analyze_image, validate_image_quality
-from tools.anti_fraud_tool import check_fraud, check_user_submission_rate, check_location_validity
-from tools.database_tool import (
-    save_facility,
-    update_facility,
-    save_reward,
-    query_facilities,
-    get_user_rewards,
-    get_facility_by_id,
-    check_existing
+# Import tool classes
+from tools.vision_tool import VisionAnalyzeTool, VisionValidateQualityTool
+from tools.anti_fraud_tool import (
+    AntiFraudCheckTool,
+    AntiFraudRateCheckTool,
+    AntiFraudLocationCheckTool,
 )
-from tools.blockchain_tool import distribute_reward, get_balance, check_verification
+from tools.database_tool import (
+    DatabaseSaveFacilityTool,
+    DatabaseUpdateFacilityTool,
+    DatabaseSaveRewardTool,
+    DatabaseQueryFacilitiesTool,
+    DatabaseGetUserRewardsTool,
+    DatabaseGetFacilityTool,
+    DatabaseCheckExistingTool,
+)
+from tools.blockchain_tool import (
+    BlockchainRewardTool,
+    BlockchainBalanceTool,
+    BlockchainCheckVerificationTool,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,45 +102,49 @@ class Help2EarnSpoonAgent:
 
     def __init__(self):
         """Initialize the SpoonOS-based Help2Earn Agent."""
-        # Configure Gemini as LLM provider
+        # Verify API key is available
         gemini_api_key = os.getenv("GEMINI_API_KEY")
         if not gemini_api_key:
             raise ValueError("GEMINI_API_KEY environment variable is required for SpoonOS agent")
 
-        # Initialize Gemini provider
+        # Initialize ChatBot with Gemini provider
         gemini_model = os.getenv("SPOON_GEMINI_MODEL", "gemini-2.0-flash")
-        self.llm_provider = GeminiProvider(
-            api_key=gemini_api_key,
-            model=gemini_model
+        self.llm = ChatBot(
+            llm_provider="gemini",
+            model_name=gemini_model,
+            api_key=gemini_api_key
         )
 
-        # Register all tools
-        self.tools = [
+        # Create tool instances
+        tool_instances = [
             # Vision tools
-            analyze_image,
-            validate_image_quality,
+            VisionAnalyzeTool(),
+            VisionValidateQualityTool(),
             # Anti-fraud tools
-            check_fraud,
-            check_user_submission_rate,
-            check_location_validity,
+            AntiFraudCheckTool(),
+            AntiFraudRateCheckTool(),
+            AntiFraudLocationCheckTool(),
             # Database tools
-            save_facility,
-            update_facility,
-            save_reward,
-            query_facilities,
-            get_user_rewards,
-            get_facility_by_id,
-            check_existing,
+            DatabaseSaveFacilityTool(),
+            DatabaseUpdateFacilityTool(),
+            DatabaseSaveRewardTool(),
+            DatabaseQueryFacilitiesTool(),
+            DatabaseGetUserRewardsTool(),
+            DatabaseGetFacilityTool(),
+            DatabaseCheckExistingTool(),
             # Blockchain tools
-            distribute_reward,
-            get_balance,
-            check_verification,
+            BlockchainRewardTool(),
+            BlockchainBalanceTool(),
+            BlockchainCheckVerificationTool(),
         ]
 
-        # Create ReAct Agent with Gemini
-        self.agent = SpoonReactAgent(
-            llm=self.llm_provider,
-            tools=self.tools,
+        # Create ToolManager with tool instances
+        self.tool_manager = ToolManager(tool_instances)
+
+        # Create SpoonReactAI Agent
+        self.agent = SpoonReactAI(
+            llm=self.llm,
+            available_tools=self.tool_manager,
             system_prompt=SYSTEM_PROMPT
         )
 
@@ -168,31 +180,26 @@ class Help2EarnSpoonAgent:
 Process this accessibility facility upload:
 
 **Input Data:**
-- Image: [base64 encoded, {len(image)} bytes]
+- Image: [base64 encoded, {len(image)} bytes] - Use this base64 data: {image_base64[:100]}... (truncated for display)
 - Location: latitude={lat}, longitude={lng}
 - Wallet Address: {wallet}
 - Image URL: {image_url or "pending"}
 
+**Full Image Base64 (for vision_analyze tool):**
+{image_base64}
+
 **Instructions:**
-1. First, analyze the image using vision_analyze with the base64 image data
-2. If valid, check for fraud using anti_fraud_check
-3. If not fraud, save to database
-4. Send blockchain reward
-5. Save reward record
+1. First, analyze the image using vision_analyze with the base64 image data above
+2. If valid, check for fraud using anti_fraud_check with latitude={lat}, longitude={lng}, and the detected facility_type
+3. If not fraud, save to database using database_save_facility
+4. Send blockchain reward using blockchain_reward
+5. Save reward record using database_save_reward
 
 Execute the complete verification workflow and report the results.
 """
 
-            # Run the agent with context containing the actual data
-            context = {
-                "image_base64": image_base64,
-                "latitude": lat,
-                "longitude": lng,
-                "wallet": wallet,
-                "image_url": image_url or "pending"
-            }
-
-            result = await self.agent.run(prompt, context=context)
+            # Run the agent
+            result = await self.agent.run(prompt)
 
             # Parse agent result into standardized response format
             return self._parse_agent_result(result)
@@ -212,6 +219,21 @@ Execute the complete verification workflow and report the results.
         to our expected response format.
         """
         try:
+            # If result is a string, try to parse JSON from it
+            if isinstance(result, str):
+                # Try to extract structured data from the text response
+                response = {
+                    "success": True,
+                    "agent_response": result
+                }
+
+                # Look for common patterns in the response
+                result_lower = result.lower()
+                if "error" in result_lower or "failed" in result_lower or "rejected" in result_lower:
+                    response["success"] = False
+
+                return response
+
             # If result is a dict, use it directly
             if isinstance(result, dict):
                 return result
@@ -221,6 +243,11 @@ Execute the complete verification workflow and report the results.
                 agent_output = result.result
                 if isinstance(agent_output, dict):
                     return agent_output
+                if isinstance(agent_output, str):
+                    return {
+                        "success": True,
+                        "agent_response": agent_output
+                    }
 
             # If result has specific attributes we need
             response = {
