@@ -52,8 +52,8 @@ export default function Map({ center, facilities, onFacilityClick }: MapProps) {
     });
     mapRef.current = map;
 
-    // Add zoom control to top-right
-    L.control.zoom({ position: 'topright' }).addTo(map);
+    // Add zoom control to bottom-right (avoid header overlap)
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

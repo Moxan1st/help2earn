@@ -107,24 +107,24 @@ export default function Home() {
             <span className="font-bold text-gray-800">Help2Earn</span>
           </div>
 
-          {/* Wallet Button */}
-          <WalletButton />
+          {/* Wallet + Rewards buttons */}
+          <div className="flex flex-col items-end gap-2">
+            <WalletButton />
+            {isConnected && (
+              <button
+                onClick={() => setShowRewards(true)}
+                className="bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors"
+              >
+                <Trophy className="w-5 h-5 text-amber-500" />
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
       {/* Bottom action bar */}
       <div className="absolute bottom-0 left-0 right-0 z-[100] p-4 pb-8">
         <div className="flex items-center justify-center gap-4">
-          {/* Rewards button */}
-          {isConnected && (
-            <button
-              onClick={() => setShowRewards(true)}
-              className="bg-white/90 backdrop-blur-sm rounded-full p-3 shadow-lg hover:bg-white transition-colors"
-            >
-              <Trophy className="w-6 h-6 text-amber-500" />
-            </button>
-          )}
-
           {/* Camera button (main action) */}
           <CameraButton
             userLocation={userLocation}
