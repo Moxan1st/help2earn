@@ -309,7 +309,7 @@ async def distribute_reward_with_hash(
         ).build_transaction({
             'from': client.account.address,
             'nonce': nonce,
-            'gas': 150000,
+            'gas': 300000,  # Increased from 150000
             'gasPrice': client.w3.eth.gas_price
         })
 
