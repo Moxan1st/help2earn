@@ -147,26 +147,26 @@ export default function Home() {
         <div className="text-sm font-medium text-gray-600 mb-3">Facility Types</div>
         <div className="space-y-2.5">
           <div className="flex items-center gap-3 text-base text-gray-700">
-            <div className="w-7 h-7 rounded-full bg-[#3B82F6] flex items-center justify-center">
-              <RampIcon className="w-4 h-4" fill="white" />
+            <div className="w-8 h-8 rounded-full bg-[#3B82F6] flex items-center justify-center">
+              <RampIcon className="w-5 h-5" fill="white" />
             </div>
             <span>Ramp 坡道</span>
           </div>
           <div className="flex items-center gap-3 text-base text-gray-700">
-            <div className="w-7 h-7 rounded-full bg-[#8B5CF6] flex items-center justify-center">
-              <ToiletIcon className="w-4 h-4" fill="white" />
+            <div className="w-8 h-8 rounded-full bg-[#8B5CF6] flex items-center justify-center">
+              <ToiletIcon className="w-5 h-5" fill="white" />
             </div>
             <span>Toilet 无障碍厕所</span>
           </div>
           <div className="flex items-center gap-3 text-base text-gray-700">
-            <div className="w-7 h-7 rounded-full bg-[#F59E0B] flex items-center justify-center">
-              <ElevatorIcon className="w-4 h-4" fill="white" />
+            <div className="w-8 h-8 rounded-full bg-[#F59E0B] flex items-center justify-center">
+              <ElevatorIcon className="w-5 h-5" fill="white" />
             </div>
             <span>Elevator 电梯</span>
           </div>
           <div className="flex items-center gap-3 text-base text-gray-700">
-            <div className="w-7 h-7 rounded-full bg-[#10B981] flex items-center justify-center">
-              <WheelchairIcon className="w-4 h-4" fill="white" />
+            <div className="w-8 h-8 rounded-full bg-[#10B981] flex items-center justify-center">
+              <WheelchairIcon className="w-5 h-5" fill="white" />
             </div>
             <span>Wheelchair 轮椅</span>
           </div>
