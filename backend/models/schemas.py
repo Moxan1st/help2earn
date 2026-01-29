@@ -69,7 +69,7 @@ class UploadResponse(BaseModel):
 class RewardRecord(BaseModel):
     """Model for a single reward record."""
     id: str
-    facility_id: str
+    facility_id: Optional[str] = None
     facility_type: Optional[str] = None
     amount: int
     tx_hash: Optional[str] = None
