@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useAccount } from 'wagmi';
 import { WalletButton } from '@/components/WalletButton';
@@ -61,12 +61,16 @@ export default function Home() {
     }
   }, [userLocation]);
 
-  const fetchFacilities = async () => {
-    if (!userLocation) return;
+  const fetchFacilities = async (lat?: number, lng?: number, radius?: number) => {
+    const queryLat = lat ?? userLocation?.lat;
+    const queryLng = lng ?? userLocation?.lng;
+    if (!queryLat || !queryLng) return;
 
     setLoading(true);
     try {
-      const data = await api.getFacilities(userLocation.lat, userLocation.lng, 500);
+      // Use provided radius or default 500m, cap at 5000m (API limit)
+      const queryRadius = Math.min(radius ?? 500, 5000);
+      const data = await api.getFacilities(queryLat, queryLng, queryRadius);
       setFacilities(data.facilities);
     } catch (error) {
       console.error('Failed to fetch facilities:', error);
@@ -75,6 +79,21 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  // Debounce timer for view changes
+  const viewChangeTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle map view changes (pan/zoom) with debounce
+  const handleViewChange = useCallback((newCenter: { lat: number; lng: number }, radius: number) => {
+    // Clear previous timer
+    if (viewChangeTimer.current) {
+      clearTimeout(viewChangeTimer.current);
+    }
+    // Debounce: wait 500ms after last view change before fetching
+    viewChangeTimer.current = setTimeout(() => {
+      fetchFacilities(newCenter.lat, newCenter.lng, radius);
+    }, 500);
+  }, []);
 
   const handleUploadSuccess = (facility: Facility) => {
     setFacilities((prev) => [facility, ...prev]);
@@ -94,6 +113,7 @@ export default function Home() {
             center={userLocation}
             facilities={facilities}
             onFacilityClick={handleFacilityClick}
+            onViewChange={handleViewChange}
           />
         )}
       </div>

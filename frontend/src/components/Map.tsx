@@ -16,9 +16,10 @@ interface MapProps {
   center: { lat: number; lng: number };
   facilities: Facility[];
   onFacilityClick: (facility: Facility) => void;
+  onViewChange?: (center: { lat: number; lng: number }, radius: number) => void;
 }
 
-export default function Map({ center, facilities, onFacilityClick }: MapProps) {
+export default function Map({ center, facilities, onFacilityClick, onViewChange }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -102,6 +103,24 @@ export default function Map({ center, facilities, onFacilityClick }: MapProps) {
         { enableHighAccuracy: true }
       );
     }
+
+    // Listen for map view changes (pan/zoom)
+    const handleViewChange = () => {
+      if (!onViewChange) return;
+      const mapCenter = map.getCenter();
+      const bounds = map.getBounds();
+      // Calculate radius as half the diagonal distance of the visible area
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
+      const radius = Math.max(
+        map.distance([mapCenter.lat, mapCenter.lng], [ne.lat, ne.lng]),
+        map.distance([mapCenter.lat, mapCenter.lng], [sw.lat, sw.lng])
+      );
+      onViewChange({ lat: mapCenter.lat, lng: mapCenter.lng }, Math.ceil(radius));
+    };
+
+    map.on('moveend', handleViewChange);
+    map.on('zoomend', handleViewChange);
 
     setMapLoaded(true);
 
