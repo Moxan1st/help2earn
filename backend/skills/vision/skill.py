@@ -104,8 +104,10 @@ async def analyze_image(image: bytes) -> dict:
         else:
             logger.warning("GEMINI_API_KEY not set, using default credentials")
 
-        # Configure Gemini
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        # Configure Gemini (use 1.5-flash for better stability)
+        model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        model = genai.GenerativeModel(model_name)
+        logger.info(f"Using Gemini model: {model_name}")
 
         # Encode image for API
         image_data = base64.b64encode(image).decode('utf-8')
@@ -137,11 +139,27 @@ async def analyze_image(image: bytes) -> dict:
         and explain why in the condition field.
         """
 
-        # Call Gemini Vision API
-        response = model.generate_content([
-            prompt,
-            {"mime_type": "image/jpeg", "data": image_data}
-        ])
+        # Call Gemini Vision API with retry for rate limits
+        import time
+        max_retries = 3
+        retry_delay = 5  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content([
+                    prompt,
+                    {"mime_type": "image/jpeg", "data": image_data}
+                ])
+                break  # Success, exit retry loop
+            except Exception as e:
+                error_str = str(e).lower()
+                if "429" in error_str or "resource exhausted" in error_str or "quota" in error_str:
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (attempt + 1)
+                        logger.warning(f"Rate limited, waiting {wait_time}s before retry {attempt + 2}/{max_retries}")
+                        time.sleep(wait_time)
+                        continue
+                raise  # Re-raise if not rate limit or last attempt
 
         # Parse response
         response_text = response.text
