@@ -100,22 +100,57 @@ export default function Home() {
 
       {/* Header overlay */}
       <header className="absolute top-0 left-0 right-0 z-[100] p-4">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
-            <MapPin className="w-5 h-5 text-primary-600" />
-            <span className="font-bold text-gray-800">Help2Earn</span>
+        <div className="flex items-start justify-between">
+          {/* Left side: Logo + Facility Types */}
+          <div className="flex flex-col gap-2">
+            {/* Logo */}
+            <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
+              <MapPin className="w-5 h-5 text-primary-600" />
+              <span className="font-semibold text-sm text-gray-800">Help2Earn</span>
+            </div>
+
+            {/* Facility type legend */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl p-3 shadow-lg">
+              <div className="text-sm font-semibold text-gray-800 mb-2">Facility Types</div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <div className="w-6 h-6 rounded-full bg-[#3B82F6] flex items-center justify-center">
+                    <RampIcon className="w-4 h-4" fill="white" />
+                  </div>
+                  <span>Ramp 坡道</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <div className="w-6 h-6 rounded-full bg-[#8B5CF6] flex items-center justify-center">
+                    <ToiletIcon className="w-4 h-4" fill="white" />
+                  </div>
+                  <span>Toilet 无障碍厕所</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <div className="w-6 h-6 rounded-full bg-[#F59E0B] flex items-center justify-center">
+                    <ElevatorIcon className="w-4 h-4" fill="white" />
+                  </div>
+                  <span>Elevator 电梯</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <div className="w-6 h-6 rounded-full bg-[#10B981] flex items-center justify-center">
+                    <WheelchairIcon className="w-4 h-4" fill="white" />
+                  </div>
+                  <span>Wheelchair 轮椅</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Wallet + Rewards buttons */}
+          {/* Right side: Wallet + Rewards */}
           <div className="flex flex-col items-end gap-2">
             <WalletButton />
             {isConnected && (
               <button
                 onClick={() => setShowRewards(true)}
-                className="bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors"
+                className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg hover:bg-white transition-colors"
               >
-                <Trophy className="w-5 h-5 text-amber-500" />
+                <Trophy className="w-4 h-4 text-amber-500" />
+                <span className="font-semibold text-sm text-gray-800">My Rewards</span>
               </button>
             )}
           </div>
@@ -139,37 +174,6 @@ export default function Home() {
           >
             <Info className="w-6 h-6 text-gray-600" />
           </button>
-        </div>
-      </div>
-
-      {/* Facility type legend */}
-      <div className="absolute bottom-32 left-4 z-[100] bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-        <div className="text-sm font-medium text-gray-600 mb-3">Facility Types</div>
-        <div className="space-y-2.5">
-          <div className="flex items-center gap-3 text-base text-gray-700">
-            <div className="w-8 h-8 rounded-full bg-[#3B82F6] flex items-center justify-center">
-              <RampIcon className="w-6 h-6" fill="white" />
-            </div>
-            <span>Ramp 坡道</span>
-          </div>
-          <div className="flex items-center gap-3 text-base text-gray-700">
-            <div className="w-8 h-8 rounded-full bg-[#8B5CF6] flex items-center justify-center">
-              <ToiletIcon className="w-6 h-6" fill="white" />
-            </div>
-            <span>Toilet 无障碍厕所</span>
-          </div>
-          <div className="flex items-center gap-3 text-base text-gray-700">
-            <div className="w-8 h-8 rounded-full bg-[#F59E0B] flex items-center justify-center">
-              <ElevatorIcon className="w-6 h-6" fill="white" />
-            </div>
-            <span>Elevator 电梯</span>
-          </div>
-          <div className="flex items-center gap-3 text-base text-gray-700">
-            <div className="w-8 h-8 rounded-full bg-[#10B981] flex items-center justify-center">
-              <WheelchairIcon className="w-6 h-6" fill="white" />
-            </div>
-            <span>Wheelchair 轮椅</span>
-          </div>
         </div>
       </div>
 

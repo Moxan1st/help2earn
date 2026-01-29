@@ -66,8 +66,8 @@ export function RewardsPanel({ walletAddress, onClose }: RewardsPanelProps) {
         {/* Header */}
         <div className="flex items-center justify-between p-3 border-b bg-amber-50">
           <div className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-amber-600" />
-            <h2 className="text-base font-semibold text-gray-800">My Rewards</h2>
+            <Trophy className="w-4 h-4 text-amber-500" />
+            <h2 className="text-sm font-semibold text-gray-800">My Rewards</h2>
           </div>
           <button
             onClick={onClose}

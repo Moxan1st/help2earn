@@ -32,7 +32,7 @@ export function WalletButton() {
                 return (
                   <button
                     onClick={openConnectModal}
-                    className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-4 py-2 rounded-full shadow-lg transition-colors"
+                    className="bg-primary-600 hover:bg-primary-700 text-white font-semibold text-sm px-4 py-2 rounded-full shadow-lg transition-colors"
                   >
                     Connect Wallet
                   </button>
@@ -43,7 +43,7 @@ export function WalletButton() {
                 return (
                   <button
                     onClick={openChainModal}
-                    className="bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-full shadow-lg transition-colors"
+                    className="bg-red-500 hover:bg-red-600 text-white font-semibold text-sm px-4 py-2 rounded-full shadow-lg transition-colors"
                   >
                     Wrong Network
                   </button>
@@ -53,13 +53,13 @@ export function WalletButton() {
               return (
                 <button
                   onClick={openAccountModal}
-                  className="bg-white/90 backdrop-blur-sm hover:bg-white text-gray-800 font-medium px-4 py-2 rounded-full shadow-lg transition-colors flex items-center gap-2"
+                  className="bg-white/90 backdrop-blur-sm hover:bg-white text-gray-800 font-semibold text-sm px-4 py-2 rounded-full shadow-lg transition-colors flex items-center gap-2"
                 >
                   {chain.hasIcon && chain.iconUrl && (
                     <img
                       src={chain.iconUrl}
                       alt={chain.name ?? 'Chain'}
-                      className="w-5 h-5 rounded-full"
+                      className="w-4 h-4 rounded-full"
                     />
                   )}
                   <span className="hidden sm:inline">
