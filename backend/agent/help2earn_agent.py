@@ -22,7 +22,7 @@ from skills.database.skill import (
     get_user_rewards as db_get_user_rewards,
     get_facility_by_id
 )
-from skills.blockchain.skill import send_reward
+from skills.blockchain.skill import send_reward, generate_location_hash, distribute_reward_with_hash
 
 logger = logging.getLogger(__name__)
 
@@ -119,14 +119,22 @@ class Help2EarnAgent:
 
             logger.info(f"Facility saved: {facility_id}")
 
-            # Step 4: Send reward
+            # Step 4: Send reward via RewardDistributor
             logger.info("Step 4: Sending reward...")
             try:
-                tx_hash = await send_reward(wallet, reward_amount)
+                # Generate location hash for on-chain verification
+                location_hash = generate_location_hash(lat, lng, facility_type)
+                tx_hash = await distribute_reward_with_hash(wallet, location_hash, reward_amount)
                 logger.info(f"Reward sent: {reward_amount} tokens, tx={tx_hash}")
             except Exception as e:
                 logger.error(f"Reward sending failed: {e}")
-                tx_hash = None
+                # Fallback to direct mint if distributor fails
+                try:
+                    tx_hash = await send_reward(wallet, reward_amount)
+                    logger.info(f"Fallback reward sent: {reward_amount} tokens, tx={tx_hash}")
+                except Exception as e2:
+                    logger.error(f"Fallback also failed: {e2}")
+                    tx_hash = None
 
             # Save reward record
             await save_reward({
