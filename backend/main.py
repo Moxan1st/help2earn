@@ -301,6 +301,47 @@ async def get_rewards(wallet: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ Debug ============
+
+@app.get("/debug/blockchain")
+async def debug_blockchain():
+    """Debug endpoint to check blockchain configuration."""
+    import os
+    from skills.blockchain.skill import get_client, MOCK_BLOCKCHAIN
+
+    client = get_client()
+
+    # Check configuration (mask sensitive data)
+    private_key = os.getenv("MINTER_PRIVATE_KEY", "")
+    has_private_key = len(private_key) > 10
+
+    result = {
+        "mock_mode": MOCK_BLOCKCHAIN,
+        "has_private_key": has_private_key,
+        "private_key_length": len(private_key),
+        "rpc_url": os.getenv("SEPOLIA_RPC_URL", "not set")[:50] + "...",
+        "token_contract": os.getenv("TOKEN_CONTRACT_ADDRESS", "not set"),
+        "distributor_contract": os.getenv("DISTRIBUTOR_CONTRACT_ADDRESS", "not set"),
+        "client_configured": client.is_configured() if client else False,
+    }
+
+    # Try to get account address if configured
+    if not MOCK_BLOCKCHAIN and client and client.account:
+        result["minter_address"] = client.account.address
+
+    # Test RPC connection
+    if not MOCK_BLOCKCHAIN and client:
+        try:
+            connected = client.w3.is_connected()
+            result["rpc_connected"] = connected
+            if connected:
+                result["chain_id"] = client.w3.eth.chain_id
+        except Exception as e:
+            result["rpc_error"] = str(e)
+
+    return result
+
+
 # ============ Statistics ============
 
 @app.get("/stats")
