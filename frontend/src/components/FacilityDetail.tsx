@@ -1,7 +1,22 @@
 'use client';
 
+import { useState } from 'react';
 import { X, MapPin, Clock, User } from 'lucide-react';
 import { Facility } from '@/services/api';
+
+// Parse AI analysis JSON
+const parseAiAnalysis = (analysis: string | undefined): { condition?: string; details?: string } => {
+  if (!analysis) return {};
+  try {
+    const parsed = JSON.parse(analysis);
+    return {
+      condition: parsed.condition,
+      details: parsed.details ? JSON.stringify(parsed.details, null, 2) : undefined
+    };
+  } catch {
+    return { condition: analysis };
+  }
+};
 
 // Facility type display names
 const FACILITY_NAMES: Record<string, { en: string; zh: string }> = {
@@ -25,8 +40,10 @@ interface FacilityDetailProps {
 }
 
 export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
+  const [imageError, setImageError] = useState(false);
   const facilityName = FACILITY_NAMES[facility.type] || { en: 'Unknown', zh: '未知' };
   const facilityColor = FACILITY_COLORS[facility.type] || 'bg-gray-500';
+  const aiAnalysis = parseAiAnalysis(facility.ai_analysis);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -60,15 +77,16 @@ export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
 
         {/* Image */}
         <div className="relative aspect-video bg-gray-200">
-          {facility.image_url ? (
+          {facility.image_url && !imageError ? (
             <img
               src={facility.image_url}
               alt={facilityName.en}
               className="w-full h-full object-cover"
+              onError={() => setImageError(true)}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-400">
-              No image available
+              {imageError ? 'Failed to load image' : 'No image available'}
             </div>
           )}
 
@@ -84,10 +102,10 @@ export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
           <h2 className="text-xl font-bold">{facilityName.en}</h2>
 
           {/* AI Analysis */}
-          {facility.ai_analysis && (
+          {aiAnalysis.condition && (
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-xs font-medium text-gray-500 mb-1">AI Analysis</div>
-              <p className="text-sm text-gray-700">{facility.ai_analysis}</p>
+              <p className="text-sm text-gray-700">{aiAnalysis.condition}</p>
             </div>
           )}
 
