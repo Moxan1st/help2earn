@@ -392,7 +392,7 @@ async def query_facilities_nearby(
         facilities = []
         for row in rows:
             facilities.append({
-                "id": row["id"],
+                "id": str(row["id"]),
                 "type": row["type"],
                 "latitude": row["latitude"],
                 "longitude": row["longitude"],
