@@ -379,6 +379,91 @@ async def debug_blockchain():
     return result
 
 
+@app.get("/debug/test-reward")
+async def test_reward():
+    """Test reward distribution to see revert reason."""
+    import os
+    from skills.blockchain.skill import get_client, generate_location_hash, MOCK_BLOCKCHAIN
+    from web3 import Web3
+
+    if MOCK_BLOCKCHAIN:
+        return {"error": "Cannot test in mock mode"}
+
+    client = get_client()
+    if not client.is_configured():
+        return {"error": "Client not configured"}
+
+    try:
+        # Test parameters
+        test_wallet = client.account.address  # Send to self for testing
+        test_lat = 31.23047
+        test_lng = 121.47389
+        test_type = "test_elevator"
+        test_amount = 50
+
+        # Generate location hash
+        location_hash = generate_location_hash(test_lat, test_lng, test_type)
+
+        # Check if already verified
+        is_verified = client.distributor.functions.verificationRecords(location_hash).call()
+
+        # Get decimals and calculate amount
+        decimals = client.token.functions.decimals().call()
+        token_amount = test_amount * (10 ** decimals)
+
+        # Get contract expected amounts
+        dist_addr = os.getenv("DISTRIBUTOR_CONTRACT_ADDRESS")
+        reward_abi = [
+            {"inputs": [], "name": "newFacilityReward", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
+            {"inputs": [], "name": "updateFacilityReward", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
+        ]
+        dist = client.w3.eth.contract(address=Web3.to_checksum_address(dist_addr), abi=reward_abi)
+        expected_new = dist.functions.newFacilityReward().call()
+        expected_update = dist.functions.updateFacilityReward().call()
+
+        result = {
+            "location_hash": location_hash.hex(),
+            "is_already_verified": is_verified,
+            "token_decimals": decimals,
+            "amount_sending": token_amount,
+            "amount_sending_formatted": f"{token_amount / 10**decimals} tokens",
+            "contract_expects_new": expected_new,
+            "contract_expects_update": expected_update,
+            "amount_matches_new": token_amount == expected_new,
+            "amount_matches_update": token_amount == expected_update,
+        }
+
+        # Try to simulate the call
+        if not is_verified:
+            try:
+                # Build the transaction
+                tx = client.distributor.functions.distributeReward(
+                    Web3.to_checksum_address(test_wallet),
+                    location_hash,
+                    token_amount
+                ).build_transaction({
+                    'from': client.account.address,
+                    'gas': 200000,
+                    'gasPrice': client.w3.eth.gas_price
+                })
+
+                # Simulate with eth_call
+                client.w3.eth.call({
+                    'from': client.account.address,
+                    'to': tx['to'],
+                    'data': tx['data'],
+                    'gas': 200000,
+                })
+                result["simulation"] = "SUCCESS - transaction should work"
+            except Exception as e:
+                result["simulation"] = f"REVERT - {str(e)}"
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # ============ Statistics ============
 
 @app.get("/stats")
