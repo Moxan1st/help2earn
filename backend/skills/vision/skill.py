@@ -104,8 +104,8 @@ async def analyze_image(image: bytes) -> dict:
         else:
             logger.warning("GEMINI_API_KEY not set, using default credentials")
 
-        # Configure Gemini (use 1.5-flash for better stability)
-        model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        # Configure Gemini (use 2.5-flash, 1.5 series has been retired)
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         model = genai.GenerativeModel(model_name)
         logger.info(f"Using Gemini model: {model_name}")
 
