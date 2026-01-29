@@ -10,6 +10,7 @@ import { RewardsPanel } from '@/components/RewardsPanel';
 import { api, Facility } from '@/services/api';
 import { MapPin, Trophy, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { RampIcon, ToiletIcon, ElevatorIcon, WheelchairIcon } from '@/icons';
 
 // Dynamically import Map component to avoid SSR issues with Mapbox
 const Map = dynamic(() => import('@/components/Map'), {
@@ -147,33 +148,25 @@ export default function Home() {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-sm text-gray-700">
             <div className="w-5 h-5 rounded-full bg-[#3B82F6] flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-3 h-3" fill="white">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
-              </svg>
+              <RampIcon className="w-3 h-3" fill="white" />
             </div>
             <span>Ramp 坡道</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-700">
             <div className="w-5 h-5 rounded-full bg-[#8B5CF6] flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-3 h-3" fill="white">
-                <path d="M9 4v1H4v14h2v-6h12v6h2V5h-5V4c0-.55-.45-1-1-1H10c-.55 0-1 .45-1 1zm6 3H9V6h6v1z" />
-              </svg>
+              <ToiletIcon className="w-3 h-3" fill="white" />
             </div>
             <span>Toilet 无障碍厕所</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-700">
             <div className="w-5 h-5 rounded-full bg-[#F59E0B] flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-3 h-3" fill="white">
-                <path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 7H8.5L12 7l3.5 3H12v5h-1v-5z" />
-              </svg>
+              <ElevatorIcon className="w-3 h-3" fill="white" />
             </div>
             <span>Elevator 电梯</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-700">
             <div className="w-5 h-5 rounded-full bg-[#10B981] flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-3 h-3" fill="white">
-                <path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm9 7h-6v13h-2v-6h-3v6H8V9H2V7h17v2z" />
-              </svg>
+              <WheelchairIcon className="w-3 h-3" fill="white" />
             </div>
             <span>Wheelchair 轮椅</span>
           </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Facility } from '@/services/api';
+import { FACILITY_SVG_STRINGS } from '@/icons';
 
 // Facility type colors
 const FACILITY_COLORS: Record<string, string> = {
@@ -9,14 +10,6 @@ const FACILITY_COLORS: Record<string, string> = {
   toilet: '#8B5CF6',
   elevator: '#F59E0B',
   wheelchair: '#10B981',
-};
-
-// Facility type icons (emoji)
-const FACILITY_ICONS: Record<string, string> = {
-  ramp: '♿',
-  toilet: '🚻',
-  elevator: '🛗',
-  wheelchair: '🦽',
 };
 
 interface MapProps {
@@ -140,7 +133,7 @@ export default function Map({ center, facilities, onFacilityClick }: MapProps) {
     // Add new markers
     facilities.forEach((facility) => {
       const color = FACILITY_COLORS[facility.type] || '#6B7280';
-      const icon = FACILITY_ICONS[facility.type] || '📍';
+      const svgIcon = FACILITY_SVG_STRINGS[facility.type] || '';
 
       const divIcon = L.divIcon({
         className: 'facility-marker',
@@ -152,11 +145,10 @@ export default function Map({ center, facilities, onFacilityClick }: MapProps) {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 18px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.3);
           border: 2px solid white;
           cursor: pointer;
-        ">${icon}</div>`,
+        ">${svgIcon}</div>`,
         iconSize: [36, 36],
         iconAnchor: [18, 18],
       });
