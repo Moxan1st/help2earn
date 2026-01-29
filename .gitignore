@@ -25,7 +25,9 @@ env/
 # Keys and Secrets
 *.json
 !package.json
+!package-lock.json
 !tsconfig.json
+!manifest.json
 !next.config.js
 !postcss.config.js
 !tailwind.config.js
