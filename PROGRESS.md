@@ -350,17 +350,19 @@ HTTPS_PROXY=http://127.0.0.1:7890
 
 ### 待修复问题
 
-1. **UI - Facility Types 标尺**
-   - 字体白色在白色底看不清
-   - 需要使用对应的 facility 形状图标
+1. ~~**UI - Facility Types 标尺**~~ ✅ 已修复
+   - 使用自定义 SVG 图标替换 emoji
+   - 统一字体样式，改善颜色对比度
+   - 移动到左上角 Logo 下方
 
 2. ~~**地图不显示已上传的 Facility**~~ ✅ 已修复
    - 修复了 `query_facilities_nearby` 中缺少 `WHERE` 关键字的 SQL 语法错误
    - 图标大小 36px，不随地图缩放变化（Leaflet divIcon 正常行为）
 
-3. **上链行为确认**
-   - 需要检查交易是否正确上链
-   - 验证 RewardDistributor 合约调用
+3. ~~**上链行为确认**~~ ✅ 已修复
+   - 修改 agent 使用 `distribute_reward_with_hash` 通过 RewardDistributor 发放奖励
+   - 生成 location hash 用于链上防重复提交
+   - 添加了 fallback 到直接 mint（如果 distributor 失败）
 
 4. **照片真实性验证系统（新功能规划）**
    - AI 判断真实性
