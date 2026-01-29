@@ -2,13 +2,15 @@
 Help2Earn FastAPI Backend
 
 Main entry point for the Help2Earn API server.
-All core business logic is driven by the SpoonOS React Agent.
+Supports two agent modes:
+- Original Help2EarnAgent (default)
+- SpoonOS ReAct Agent (USE_SPOON_AGENT=true)
 """
 
 import os
 import logging
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +19,14 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 load_dotenv()
 
-from agent.help2earn_agent import Help2EarnAgent
+# Agent imports - conditional based on USE_SPOON_AGENT
+USE_SPOON_AGENT = os.getenv("USE_SPOON_AGENT", "false").lower() == "true"
+
+if USE_SPOON_AGENT:
+    from agent.spoon_agent import Help2EarnSpoonAgent as AgentClass
+else:
+    from agent.help2earn_agent import Help2EarnAgent as AgentClass
+
 from models.schemas import (
     UploadResponse,
     FacilityListResponse,
@@ -38,7 +47,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Global agent instance
-agent: Optional[Help2EarnAgent] = None
+agent: Optional[Union["AgentClass"]] = None
 
 
 @asynccontextmanager
@@ -48,8 +57,12 @@ async def lifespan(app: FastAPI):
 
     # Startup
     logger.info("Starting Help2Earn API server...")
-    agent = Help2EarnAgent()
-    logger.info("SpoonOS React Agent initialized")
+    agent = AgentClass()
+
+    if USE_SPOON_AGENT:
+        logger.info("SpoonOS ReAct Agent initialized (USE_SPOON_AGENT=true)")
+    else:
+        logger.info("Original Help2EarnAgent initialized (USE_SPOON_AGENT=false)")
 
     yield
 
@@ -96,6 +109,7 @@ async def health_check():
         version="1.0.0",
         services={
             "agent": agent is not None,
+            "agent_type": "spoon" if USE_SPOON_AGENT else "original",
             "database": True  # Could add actual DB check
         }
     )
