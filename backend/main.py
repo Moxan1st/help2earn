@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Agent imports - conditional based on USE_SPOON_AGENT
-USE_SPOON_AGENT = os.getenv("USE_SPOON_AGENT", "false").lower() == "true"
+USE_SPOON_AGENT = os.getenv("USE_SPOON_AGENT", "true").lower() == "true"
 
 if USE_SPOON_AGENT:
     from agent.spoon_agent import Help2EarnSpoonAgent as AgentClass
