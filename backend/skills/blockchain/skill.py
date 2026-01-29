@@ -247,10 +247,11 @@ async def send_reward(wallet: str, amount: int) -> str:
         receipt = client.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
 
         if receipt.status == 1:
-            logger.info(f"Reward sent: {amount} tokens to {wallet}, tx: {tx_hash.hex()}")
-            return tx_hash.hex()
+            tx_hash_str = "0x" + tx_hash.hex() if not tx_hash.hex().startswith("0x") else tx_hash.hex()
+            logger.info(f"Reward sent: {amount} tokens to {wallet}, tx: {tx_hash_str}")
+            return tx_hash_str
         else:
-            logger.error(f"Transaction failed: {tx_hash.hex()}")
+            logger.error(f"Transaction failed: 0x{tx_hash.hex()}")
             raise Exception("Transaction failed")
 
     except Exception as e:
@@ -321,8 +322,9 @@ async def distribute_reward_with_hash(
         receipt = client.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
 
         if receipt.status == 1:
-            logger.info(f"Reward distributed: {amount} tokens to {wallet}, tx: {tx_hash.hex()}")
-            return tx_hash.hex()
+            tx_hash_str = "0x" + tx_hash.hex() if not tx_hash.hex().startswith("0x") else tx_hash.hex()
+            logger.info(f"Reward distributed: {amount} tokens to {wallet}, tx: {tx_hash_str}")
+            return tx_hash_str
         else:
             raise Exception("Transaction failed")
 
