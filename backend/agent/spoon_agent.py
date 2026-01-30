@@ -17,6 +17,44 @@ from spoon_ai import ChatBot
 from spoon_ai.agents import SpoonReactAI
 from spoon_ai.tools import ToolManager
 
+
+class Help2EarnReactAgent(SpoonReactAI):
+    """Custom ReAct Agent that doesn't terminate early on finish_reason."""
+
+    # Track completed tools to know when workflow is done
+    _completed_tools: set = set()
+
+    def _should_terminate_on_finish_reason(self, response) -> bool:
+        """Override to prevent early termination - only stop when workflow is complete."""
+        # Check which tools have been executed by looking at tool_calls
+        tool_calls = getattr(response, 'tool_calls', None) or []
+        for tc in tool_calls:
+            tool_name = getattr(tc, 'name', None) or (tc.function.name if hasattr(tc, 'function') else None)
+            if tool_name:
+                self._completed_tools.add(tool_name)
+
+        # Define required workflow tools
+        required_workflow = {'vision_analyze', 'anti_fraud_check', 'database_save_facility', 'blockchain_reward', 'database_save_reward'}
+
+        # Check if at least database_save_reward was called (workflow complete)
+        # or if we've called enough tools
+        if 'database_save_reward' in self._completed_tools:
+            logger.info("Workflow complete - database_save_reward executed")
+            return True
+
+        # If finish_reason is stop but workflow isn't complete, continue
+        finish_reason = getattr(response, 'finish_reason', None)
+        if finish_reason == "stop" and len(self._completed_tools) < 5:
+            logger.info(f"Preventing early termination - only {len(self._completed_tools)} tools called: {self._completed_tools}")
+            return False
+
+        return super()._should_terminate_on_finish_reason(response)
+
+    def clear(self):
+        """Clear state including completed tools."""
+        super().clear()
+        self._completed_tools = set()
+
 # Global context for current upload (to avoid passing large data through LLM)
 _current_upload_context = {}
 
@@ -145,8 +183,8 @@ Continue with the next step in the workflow:
 What is the next tool to call?
 """
 
-        # Create SpoonReactAI Agent with required tool_choice to force tool execution
-        self.agent = SpoonReactAI(
+        # Create custom ReAct Agent with required tool_choice to force tool execution
+        self.agent = Help2EarnReactAgent(
             llm=self.llm,
             available_tools=self.tool_manager,
             system_prompt=SYSTEM_PROMPT,
