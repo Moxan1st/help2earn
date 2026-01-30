@@ -21,9 +21,11 @@ from spoon_ai.tools import ToolManager
 class Help2EarnReactAgent(SpoonReactAI):
     """Custom ReAct Agent that handles Gemini's lack of tool_choice support."""
 
-    # Track completed tools and their results
-    _completed_tools: list = []
-    _tool_results: dict = {}
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Instance attributes for tracking (not class attributes!)
+        self._completed_tools = []
+        self._tool_results = {}
 
     def _get_next_tool_call(self) -> Optional[dict]:
         """Determine the next tool to call based on workflow state."""
@@ -112,13 +114,18 @@ class Help2EarnReactAgent(SpoonReactAI):
 
     async def step(self) -> str:
         """Override step to manually control workflow when Gemini returns empty."""
-        from spoon_ai.schema import AgentState, ToolCall
+        from spoon_ai.schema import AgentState
 
         # First, try normal LLM-driven step
         should_act = await self.think()
 
-        # If LLM returned tools, execute them normally
+        # If LLM returned tools, execute them normally and track
         if self.tool_calls:
+            # Track the tool that LLM selected
+            for tc in self.tool_calls:
+                tool_name = getattr(tc, 'name', None) or (tc.function.name if hasattr(tc, 'function') else None)
+                if tool_name and tool_name not in [t['name'] for t in self._completed_tools]:
+                    logger.info(f"[WORKFLOW] LLM selected tool: {tool_name}")
             return await self.act()
 
         # LLM returned empty - manually determine next tool
@@ -127,15 +134,21 @@ class Help2EarnReactAgent(SpoonReactAI):
             self.state = AgentState.FINISHED
             return "Workflow complete or stopped due to validation failure."
 
-        # Create manual tool call
+        # Create manual tool call with proper structure
         logger.info(f"[WORKFLOW] Manually injecting tool call: {next_tool['name']}")
 
-        # Create a ToolCall object
+        # Create a ToolCall-like object with function attribute (SpoonOS expects this)
+        class FunctionSpec:
+            def __init__(self, name, arguments):
+                self.name = name
+                self.arguments = arguments
+
         class ManualToolCall:
             def __init__(self, name, arguments):
                 self.name = name
                 self.arguments = arguments
                 self.id = f"manual_{name}"
+                self.function = FunctionSpec(name, arguments)
 
         self.tool_calls = [ManualToolCall(next_tool['name'], next_tool['arguments'])]
 
@@ -144,29 +157,39 @@ class Help2EarnReactAgent(SpoonReactAI):
 
     async def execute_tool(self, tool_call) -> str:
         """Override to track tool results."""
+        # Get tool name
+        tool_name = getattr(tool_call, 'name', None)
+        if not tool_name and hasattr(tool_call, 'function'):
+            tool_name = tool_call.function.name
+
+        logger.info(f"[WORKFLOW] execute_tool called for: {tool_name}")
+
         result = await super().execute_tool(tool_call)
 
+        logger.info(f"[WORKFLOW] Tool {tool_name} returned: {str(result)[:200]}...")
+
         # Track completed tool
-        tool_name = getattr(tool_call, 'name', None)
         if tool_name:
             self._completed_tools.append({'name': tool_name})
 
             # Parse and store result
             try:
-                import json
                 # Result might be a string representation of dict
                 if isinstance(result, str) and result.startswith('{'):
                     self._tool_results[tool_name] = json.loads(result)
                 elif isinstance(result, str) and 'Observed output' in result:
-                    # Extract dict from SpoonOS format
+                    # Extract dict from SpoonOS format "Observed output of cmd xxx execution: {...}"
                     import re
-                    match = re.search(r'\{.*\}', result, re.DOTALL)
+                    match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', result, re.DOTALL)
                     if match:
-                        self._tool_results[tool_name] = eval(match.group())
+                        try:
+                            self._tool_results[tool_name] = eval(match.group())
+                        except:
+                            self._tool_results[tool_name] = json.loads(match.group())
             except Exception as e:
-                logger.warning(f"Could not parse tool result: {e}")
+                logger.warning(f"Could not parse tool result for {tool_name}: {e}")
 
-            logger.info(f"[WORKFLOW] Tool {tool_name} completed, result stored")
+            logger.info(f"[WORKFLOW] Tool {tool_name} tracked. Total completed: {[t['name'] for t in self._completed_tools]}")
 
         return result
 
