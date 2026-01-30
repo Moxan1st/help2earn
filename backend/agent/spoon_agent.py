@@ -113,7 +113,7 @@ class Help2EarnReactAgent(SpoonReactAI):
         return None
 
     async def step(self, **kwargs) -> str:
-        """Override step to manually control workflow when Gemini returns empty."""
+        """Override step to manually control workflow - loops until complete."""
         from spoon_ai.schema import AgentState
 
         logger.info(f"[WORKFLOW] step() called, current state: {self.state}, completed: {[t['name'] for t in self._completed_tools]}")
@@ -125,44 +125,59 @@ class Help2EarnReactAgent(SpoonReactAI):
 
         # If LLM returned tools, execute them normally and track
         if self.tool_calls:
-            # Track the tool that LLM selected
             for tc in self.tool_calls:
                 tool_name = getattr(tc, 'name', None) or (tc.function.name if hasattr(tc, 'function') else None)
-                if tool_name and tool_name not in [t['name'] for t in self._completed_tools]:
+                if tool_name:
                     logger.info(f"[WORKFLOW] LLM selected tool: {tool_name}")
-            return await self.act()
+            await self.act()
 
-        # LLM returned empty - manually determine next tool
-        next_tool = self._get_next_tool_call()
-        if next_tool is None:
-            self.state = AgentState.FINISHED
-            return "Workflow complete or stopped due to validation failure."
+        # Now continue with manual workflow until complete
+        # This bypasses SpoonOS run loop issues with Gemini
+        while True:
+            next_tool = self._get_next_tool_call()
+            if next_tool is None:
+                logger.info("[WORKFLOW] Workflow complete!")
+                self.state = AgentState.FINISHED
+                return self._build_final_result()
 
-        # Reset state to RUNNING (think() might have set it to FINISHED)
-        self.state = AgentState.RUNNING
+            # Reset state to RUNNING
+            self.state = AgentState.RUNNING
 
-        # Create manual tool call with proper structure
-        logger.info(f"[WORKFLOW] Manually injecting tool call: {next_tool['name']}")
+            logger.info(f"[WORKFLOW] Executing next tool: {next_tool['name']}")
 
-        # Create a ToolCall-like object with function attribute (SpoonOS expects this)
-        class FunctionSpec:
-            def __init__(self, name, arguments):
-                self.name = name
-                self.arguments = arguments
+            # Create manual tool call
+            class FunctionSpec:
+                def __init__(self, name, arguments):
+                    self.name = name
+                    self.arguments = arguments
 
-        class ManualToolCall:
-            def __init__(self, name, arguments):
-                self.name = name
-                self.arguments = arguments
-                self.id = f"manual_{name}"
-                self.function = FunctionSpec(name, arguments)
+            class ManualToolCall:
+                def __init__(self, name, arguments):
+                    self.name = name
+                    self.arguments = arguments
+                    self.id = f"manual_{name}"
+                    self.function = FunctionSpec(name, arguments)
 
-        self.tool_calls = [ManualToolCall(next_tool['name'], next_tool['arguments'])]
+            self.tool_calls = [ManualToolCall(next_tool['name'], next_tool['arguments'])]
 
-        # Execute the tool
-        result = await self.act()
-        logger.info(f"[WORKFLOW] act() returned, state is now: {self.state}")
-        return result
+            # Execute the tool
+            await self.act()
+
+    def _build_final_result(self) -> str:
+        """Build the final result from completed tools."""
+        vision_result = self._tool_results.get('vision_analyze', {})
+        fraud_result = self._tool_results.get('anti_fraud_check', {})
+        db_result = self._tool_results.get('database_save_facility', {})
+        blockchain_result = self._tool_results.get('blockchain_reward', {})
+
+        return json.dumps({
+            "success": True,
+            "facility_id": db_result.get('facility_id'),
+            "facility_type": vision_result.get('facility_type'),
+            "condition": vision_result.get('condition'),
+            "reward_amount": fraud_result.get('reward_amount', 50),
+            "tx_hash": blockchain_result.get('tx_hash')
+        })
 
     async def execute_tool(self, tool_call) -> str:
         """Override to track tool results."""
