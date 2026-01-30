@@ -23,7 +23,7 @@ pydantic-settings==2.1.0
 
 # Utilities
 python-dotenv==1.0.0
-httpx==0.26.0
+httpx[socks]==0.26.0
 
 # Google Cloud Storage
 google-cloud-storage==2.14.0
