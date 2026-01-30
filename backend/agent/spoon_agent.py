@@ -26,26 +26,38 @@ class Help2EarnReactAgent(SpoonReactAI):
 
     def _should_terminate_on_finish_reason(self, response) -> bool:
         """Override to prevent early termination - only stop when workflow is complete."""
-        # Check which tools have been executed by looking at tool_calls
+        # DEBUG: Log full response details
+        finish_reason = getattr(response, 'finish_reason', None)
+        native_finish_reason = getattr(response, 'native_finish_reason', None)
+        content = getattr(response, 'content', None)
         tool_calls = getattr(response, 'tool_calls', None) or []
+
+        logger.info(f"[DEBUG] LLM Response Analysis:")
+        logger.info(f"  - finish_reason: {finish_reason}")
+        logger.info(f"  - native_finish_reason: {native_finish_reason}")
+        logger.info(f"  - tool_calls count: {len(tool_calls)}")
+        logger.info(f"  - content (first 500 chars): {str(content)[:500] if content else 'None'}")
+
+        # Check which tools have been executed
         for tc in tool_calls:
             tool_name = getattr(tc, 'name', None) or (tc.function.name if hasattr(tc, 'function') else None)
             if tool_name:
                 self._completed_tools.add(tool_name)
+                logger.info(f"  - Tool called: {tool_name}")
 
         # Define required workflow tools
         required_workflow = {'vision_analyze', 'anti_fraud_check', 'database_save_facility', 'blockchain_reward', 'database_save_reward'}
 
+        logger.info(f"  - Completed tools so far: {self._completed_tools}")
+
         # Check if at least database_save_reward was called (workflow complete)
-        # or if we've called enough tools
         if 'database_save_reward' in self._completed_tools:
             logger.info("Workflow complete - database_save_reward executed")
             return True
 
         # If finish_reason is stop but workflow isn't complete, continue
-        finish_reason = getattr(response, 'finish_reason', None)
         if finish_reason == "stop" and len(self._completed_tools) < 5:
-            logger.info(f"Preventing early termination - only {len(self._completed_tools)} tools called: {self._completed_tools}")
+            logger.info(f"[DEBUG] Preventing early termination - forcing continue")
             return False
 
         return super()._should_terminate_on_finish_reason(response)
