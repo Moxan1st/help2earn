@@ -112,7 +112,7 @@ class Help2EarnReactAgent(SpoonReactAI):
         logger.info("[WORKFLOW] All tools completed!")
         return None
 
-    async def step(self) -> str:
+    async def step(self, **kwargs) -> str:
         """Override step to manually control workflow when Gemini returns empty."""
         from spoon_ai.schema import AgentState
 
@@ -160,7 +160,9 @@ class Help2EarnReactAgent(SpoonReactAI):
         self.tool_calls = [ManualToolCall(next_tool['name'], next_tool['arguments'])]
 
         # Execute the tool
-        return await self.act()
+        result = await self.act()
+        logger.info(f"[WORKFLOW] act() returned, state is now: {self.state}")
+        return result
 
     async def execute_tool(self, tool_call) -> str:
         """Override to track tool results."""
