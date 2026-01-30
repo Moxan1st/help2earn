@@ -49,49 +49,38 @@ SYSTEM_PROMPT = """
 You are the Help2Earn verification agent. Your job is to process accessibility facility uploads
 and ensure they are valid, not fraudulent, and properly rewarded.
 
-## Your Workflow
+CRITICAL: You MUST complete ALL 5 steps below. Do NOT stop after vision analysis.
 
-When processing an upload, follow these steps in order:
+## Your Workflow (MUST complete all steps)
 
-1. **Vision Analysis** - Use the `vision_analyze` tool to analyze the image
-   - Check if the image shows a valid accessibility facility
-   - Identify the facility type (ramp, toilet, elevator, wheelchair)
-   - Assess the facility condition
+1. **Vision Analysis** - Use `vision_analyze` tool with image_base64="USE_CONTEXT"
+   - If is_valid=false, stop and report rejection
+   - If is_valid=true, CONTINUE to step 2
 
-2. **Fraud Detection** - Use the `anti_fraud_check` tool to check for duplicates
-   - Check if this is a duplicate submission (same location within 15 days)
-   - Determine the appropriate reward amount:
-     - New facility: 50 tokens
-     - Facility update (>15 days old): 25 tokens
-     - Duplicate: 0 tokens (reject)
+2. **Fraud Detection** - Use `anti_fraud_check` tool
+   - Pass: latitude, longitude, facility_type (from step 1)
+   - If is_fraud=true, stop and report rejection
+   - If is_fraud=false, CONTINUE to step 3
 
-3. **Database Storage** - Use the appropriate database tool
-   - For new facilities: Use `database_save_facility`
-   - For updates: Use `database_update_facility`
+3. **Database Storage** - Use `database_save_facility` tool
+   - Pass: latitude, longitude, facility_type, condition, image_url, wallet_address
+   - Save the returned facility_id for step 5
+   - CONTINUE to step 4
 
-4. **Reward Distribution** - Use the `blockchain_reward` tool
-   - Send tokens to the user's wallet
-   - Record the transaction
+4. **Reward Distribution** - Use `blockchain_reward` tool
+   - Pass: wallet_address, amount (50 for new, 25 for update), facility_type, latitude, longitude
+   - Save the tx_hash for step 5
+   - CONTINUE to step 5
 
-5. **Record Reward** - Use `database_save_reward` to save the reward record
+5. **Record Reward** - Use `database_save_reward` tool
+   - Pass: wallet_address, amount, facility_id (from step 3), tx_hash (from step 4)
+   - This completes the workflow
 
-## Important Rules
+## Important
 
-- Always analyze the image FIRST before any other checks
-- If the image is not a valid accessibility facility, reject immediately
-- If fraud check shows is_fraud=true, reject the submission
-- Always save the facility before sending rewards
-- Always record the reward in the database after sending
-
-## Response Format
-
-After completing all steps, summarize the result with:
-- Whether the submission was successful
-- The facility ID (if saved)
-- The facility type
-- The reward amount
-- The transaction hash (if reward was sent)
-- Any errors encountered
+- You MUST call tools in sequence: vision_analyze → anti_fraud_check → database_save_facility → blockchain_reward → database_save_reward
+- Do NOT stop until all 5 steps are complete or a rejection occurs
+- Always use image_base64="USE_CONTEXT" for vision tools
 """
 
 
@@ -191,22 +180,23 @@ class Help2EarnSpoonAgent:
 
             # Create the prompt for the agent (without full image data)
             prompt = f"""
-Process this accessibility facility upload:
+Process this accessibility facility upload. You MUST complete ALL steps.
 
 **Input Data:**
-- Image: [stored in context, {len(image)} bytes] - Use image_base64="USE_CONTEXT" to retrieve from context
-- Location: latitude={lat}, longitude={lng}
-- Wallet Address: {wallet}
-- Image URL: {image_url or "pending"}
+- latitude: {lat}
+- longitude: {lng}
+- wallet_address: {wallet}
+- image_url: {image_url or "pending"}
 
-**Instructions:**
-1. First, analyze the image using vision_analyze with image_base64="USE_CONTEXT" (the tool will retrieve the actual image from context)
-2. If valid, check for fraud using anti_fraud_check with latitude={lat}, longitude={lng}, and the detected facility_type
-3. If not fraud, save to database using database_save_facility
-4. Send blockchain reward using blockchain_reward
-5. Save reward record using database_save_reward
+**Execute these steps in order:**
 
-Execute the complete verification workflow and report the results.
+Step 1: Call vision_analyze with image_base64="USE_CONTEXT"
+Step 2: If is_valid=true, call anti_fraud_check with latitude={lat}, longitude={lng}, facility_type=<from step 1>
+Step 3: If is_fraud=false, call database_save_facility with all required params
+Step 4: Call blockchain_reward with wallet_address={wallet}, amount=50, facility_type=<from step 1>, latitude={lat}, longitude={lng}
+Step 5: Call database_save_reward with the facility_id and tx_hash from previous steps
+
+START NOW with step 1.
 """
 
             # Run the agent
