@@ -133,11 +133,26 @@ class Help2EarnSpoonAgent:
         # Create ToolManager with tool instances
         self.tool_manager = ToolManager(tool_instances)
 
-        # Create SpoonReactAI Agent
+        # Next step prompt to guide agent to continue workflow
+        next_step_prompt = """
+Continue with the next step in the workflow:
+- If vision_analyze was just called and is_valid=true, call anti_fraud_check next
+- If anti_fraud_check was called and is_fraud=false, call database_save_facility next
+- If database_save_facility was called, call blockchain_reward next
+- If blockchain_reward was called, call database_save_reward next
+- Only stop when all 5 steps are complete or a rejection occurred
+
+What is the next tool to call?
+"""
+
+        # Create SpoonReactAI Agent with required tool_choice to force tool execution
         self.agent = SpoonReactAI(
             llm=self.llm,
             available_tools=self.tool_manager,
-            system_prompt=SYSTEM_PROMPT
+            system_prompt=SYSTEM_PROMPT,
+            next_step_prompt=next_step_prompt,
+            tool_choice="required",
+            max_steps=15  # Allow more steps for complete workflow
         )
 
         logger.info(f"Help2EarnSpoonAgent initialized with Gemini model: {gemini_model}")
