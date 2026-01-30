@@ -17,6 +17,9 @@ from spoon_ai import ChatBot
 from spoon_ai.agents import SpoonReactAI
 from spoon_ai.tools import ToolManager
 
+# Global context for current upload (to avoid passing large data through LLM)
+_current_upload_context = {}
+
 # Import tool classes
 from tools.vision_tool import VisionAnalyzeTool, VisionValidateQualityTool
 from tools.anti_fraud_tool import (
@@ -171,25 +174,33 @@ class Help2EarnSpoonAgent:
         Returns:
             dict with success status, facility info, and reward details
         """
-        try:
-            # Encode image to base64 for tool passing
-            image_base64 = base64.b64encode(image).decode('utf-8')
+        global _current_upload_context
 
-            # Create the prompt for the agent
+        try:
+            # Store image in context for tools to access directly
+            # This avoids passing large base64 data through the LLM which causes truncation
+            image_base64 = base64.b64encode(image).decode('utf-8')
+            _current_upload_context = {
+                "image_base64": image_base64,
+                "image_bytes": image,
+                "lat": lat,
+                "lng": lng,
+                "wallet": wallet,
+                "image_url": image_url
+            }
+
+            # Create the prompt for the agent (without full image data)
             prompt = f"""
 Process this accessibility facility upload:
 
 **Input Data:**
-- Image: [base64 encoded, {len(image)} bytes] - Use this base64 data: {image_base64[:100]}... (truncated for display)
+- Image: [stored in context, {len(image)} bytes] - Use image_base64="USE_CONTEXT" to retrieve from context
 - Location: latitude={lat}, longitude={lng}
 - Wallet Address: {wallet}
 - Image URL: {image_url or "pending"}
 
-**Full Image Base64 (for vision_analyze tool):**
-{image_base64}
-
 **Instructions:**
-1. First, analyze the image using vision_analyze with the base64 image data above
+1. First, analyze the image using vision_analyze with image_base64="USE_CONTEXT" (the tool will retrieve the actual image from context)
 2. If valid, check for fraud using anti_fraud_check with latitude={lat}, longitude={lng}, and the detected facility_type
 3. If not fraud, save to database using database_save_facility
 4. Send blockchain reward using blockchain_reward
@@ -201,11 +212,15 @@ Execute the complete verification workflow and report the results.
             # Run the agent
             result = await self.agent.run(prompt)
 
+            # Clear context after processing
+            _current_upload_context = {}
+
             # Parse agent result into standardized response format
             return self._parse_agent_result(result)
 
         except Exception as e:
             logger.error(f"SpoonOS agent error: {e}")
+            _current_upload_context = {}  # Clear context on error
             return {
                 "success": False,
                 "reason": f"Agent processing error: {str(e)}"

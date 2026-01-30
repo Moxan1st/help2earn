@@ -37,7 +37,7 @@ and extract relevant details."""
         Analyze an uploaded image to identify accessibility facilities.
 
         Args:
-            image_base64: Base64 encoded image data
+            image_base64: Base64 encoded image data, or "USE_CONTEXT" to retrieve from upload context
 
         Returns:
             dict with analysis results including:
@@ -50,8 +50,22 @@ and extract relevant details."""
         from skills.vision.skill import analyze_image as _analyze_image
 
         try:
-            # Decode base64 to bytes
-            image_bytes = base64.b64decode(image_base64)
+            # Check if we should retrieve image from context
+            if image_base64 == "USE_CONTEXT" or image_base64.startswith("USE_CONTEXT"):
+                from agent.spoon_agent import _current_upload_context
+                if not _current_upload_context or "image_bytes" not in _current_upload_context:
+                    return {
+                        "is_valid": False,
+                        "facility_type": None,
+                        "condition": "No image in context",
+                        "confidence": 0.0,
+                        "details": None
+                    }
+                image_bytes = _current_upload_context["image_bytes"]
+                logger.info(f"Retrieved image from context: {len(image_bytes)} bytes")
+            else:
+                # Decode base64 to bytes
+                image_bytes = base64.b64decode(image_base64)
 
             # Call the existing skill implementation
             result = await _analyze_image(image_bytes)
@@ -92,7 +106,7 @@ Checks if image is not too small (min 200x200) and not too large (max 10MB)."""
         Validate image quality before analysis.
 
         Args:
-            image_base64: Base64 encoded image data
+            image_base64: Base64 encoded image data, or "USE_CONTEXT" to retrieve from upload context
 
         Returns:
             dict with quality assessment
@@ -100,7 +114,17 @@ Checks if image is not too small (min 200x200) and not too large (max 10MB)."""
         from skills.vision.skill import validate_image_quality as _validate
 
         try:
-            image_bytes = base64.b64decode(image_base64)
+            # Check if we should retrieve image from context
+            if image_base64 == "USE_CONTEXT" or image_base64.startswith("USE_CONTEXT"):
+                from agent.spoon_agent import _current_upload_context
+                if not _current_upload_context or "image_bytes" not in _current_upload_context:
+                    return {
+                        "is_acceptable": False,
+                        "reason": "No image in context"
+                    }
+                image_bytes = _current_upload_context["image_bytes"]
+            else:
+                image_bytes = base64.b64decode(image_base64)
             return await _validate(image_bytes)
         except Exception as e:
             logger.error(f"Image quality validation error: {e}")
