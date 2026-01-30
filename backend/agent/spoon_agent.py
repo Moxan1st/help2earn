@@ -71,7 +71,7 @@ class Help2EarnReactAgent(SpoonReactAI):
                     'latitude': ctx.get('lat'),
                     'longitude': ctx.get('lng'),
                     'facility_type': vision_result.get('facility_type'),
-                    'image_url': ctx.get('image_url', ''),
+                    'image_url': ctx.get('image_url') or '',  # Handle None explicitly
                     'contributor_address': ctx.get('wallet'),  # Note: parameter is contributor_address not wallet_address
                     'ai_analysis': json.dumps(vision_result.get('details', {}))
                 }
@@ -79,6 +79,12 @@ class Help2EarnReactAgent(SpoonReactAI):
 
         # Get database result
         db_result = self._tool_results.get('database_save_facility', {})
+        
+        # Check if database save failed (if it was executed)
+        if 'database_save_facility' in completed_names and not db_result.get('success', False):
+            logger.info("[WORKFLOW] Database save failed, stopping")
+            return None
+            
         facility_id = db_result.get('facility_id')
 
         if 'blockchain_reward' not in completed_names:
@@ -86,16 +92,22 @@ class Help2EarnReactAgent(SpoonReactAI):
             return {
                 'name': 'blockchain_reward',
                 'arguments': {
-                    'wallet_address': ctx.get('wallet'),
+                    'wallet': ctx.get('wallet'),  # Fixed: wallet instead of wallet_address
                     'amount': reward_amount,
                     'facility_type': vision_result.get('facility_type'),
-                    'latitude': ctx.get('lat'),
-                    'longitude': ctx.get('lng')
+                    'lat': ctx.get('lat'),        # Fixed: lat instead of latitude
+                    'lng': ctx.get('lng')         # Fixed: lng instead of longitude
                 }
             }
 
         # Get blockchain result
         blockchain_result = self._tool_results.get('blockchain_reward', {})
+        
+        # Check if blockchain reward failed
+        if 'blockchain_reward' in completed_names and not blockchain_result.get('success', False):
+            logger.info("[WORKFLOW] Blockchain reward failed, stopping")
+            return None
+            
         tx_hash = blockchain_result.get('tx_hash')
 
         if 'database_save_reward' not in completed_names:
@@ -119,59 +131,70 @@ class Help2EarnReactAgent(SpoonReactAI):
         logger.info(f"[WORKFLOW-DEBUG] step() called, current state: {self.state}, completed: {[t['name'] for t in self._completed_tools]}")
 
         # First, try normal LLM-driven step
-        try:
-            should_act = await self.think()
-            logger.info(f"[WORKFLOW-DEBUG] think() returned should_act={should_act}, tool_calls={len(self.tool_calls) if self.tool_calls else 0}, state={self.state}")
-
-            # If LLM returned tools, execute them normally and track
-            if self.tool_calls:
-                for tc in self.tool_calls:
-                    tool_name = getattr(tc, 'name', None) or (tc.function.name if hasattr(tc, 'function') else None)
-                    if tool_name:
-                        logger.info(f"[WORKFLOW-DEBUG] LLM selected tool: {tool_name}")
-                await self.act()
-        except Exception as e:
-            logger.error(f"[WORKFLOW-ERROR] Error in initial think/act: {e}")
+        # COMMENTED OUT to enforce strict sequential workflow and avoid LLM loops/hallucinations
+        # The _get_next_tool_call method implements the ReAct logic deterministically.
+        # try:
+        #     should_act = await self.think()
+        #     logger.info(f"[WORKFLOW-DEBUG] think() returned should_act={should_act}, tool_calls={len(self.tool_calls) if self.tool_calls else 0}, state={self.state}")
+        #
+        #     # If LLM returned tools, execute them normally and track
+        #     if self.tool_calls:
+        #         for tc in self.tool_calls:
+        #             tool_name = getattr(tc, 'name', None) or (tc.function.name if hasattr(tc, 'function') else None)
+        #             if tool_name:
+        #                 logger.info(f"[WORKFLOW-DEBUG] LLM selected tool: {tool_name}")
+        #         await self.act()
+        # except Exception as e:
+        #     logger.error(f"[WORKFLOW-ERROR] Error in initial think/act: {e}")
 
         # Now continue with manual workflow until complete
         # This bypasses SpoonOS run loop issues with Gemini
-        loop_count = 0
-        while loop_count < 15:  # Safety break
-            loop_count += 1
-            try:
-                next_tool = self._get_next_tool_call()
-                if next_tool is None:
-                    logger.info("[WORKFLOW-DEBUG] Workflow complete!")
-                    self.state = AgentState.FINISHED
-                    return self._build_final_result()
+        # We process ONE step manually if needed, then return to let the main loop continue
+        # This prevents "Step timed out" errors from the framework
+        
+        next_tool = self._get_next_tool_call()
+        if next_tool is None:
+            logger.info("[WORKFLOW-DEBUG] Workflow complete!")
+            self.state = AgentState.FINISHED
+            return self._build_final_result()
 
-                # Reset state to RUNNING
-                self.state = AgentState.RUNNING
+        # Check if we should execute manually
+        # If tool_calls were already executed by think/act above, we might want to skip?
+        # But self.tool_calls is cleared by act(). 
+        # If we just executed a tool via LLM, we should probably return and let the next step handle the next tool.
+        # But how do we know if we just executed a tool?
+        # We can check if the last completed tool matches next_tool.
+        
+        last_completed = self._completed_tools[-1]['name'] if self._completed_tools else None
+        if last_completed == next_tool['name']:
+            logger.info(f"[WORKFLOW-DEBUG] Tool {next_tool['name']} just executed by LLM. Returning for next step.")
+            self.state = AgentState.RUNNING
+            return self._build_final_result()
 
-                logger.info(f"[WORKFLOW-DEBUG] Executing next tool: {next_tool['name']}")
+        # If we are here, LLM did NOT execute the next required tool. We do it manually.
+        logger.info(f"[WORKFLOW-DEBUG] Manual fallback. Executing next tool: {next_tool['name']}")
 
-                # Create manual tool call
-                class FunctionSpec:
-                    def __init__(self, name, arguments):
-                        self.name = name
-                        self.arguments = arguments
+        # Reset state to RUNNING
+        self.state = AgentState.RUNNING
 
-                class ManualToolCall:
-                    def __init__(self, name, arguments):
-                        self.name = name
-                        self.arguments = arguments
-                        self.id = f"manual_{name}"
-                        self.function = FunctionSpec(name, arguments)
+        # Create manual tool call
+        class FunctionSpec:
+            def __init__(self, name, arguments):
+                self.name = name
+                self.arguments = arguments
 
-                self.tool_calls = [ManualToolCall(next_tool['name'], next_tool['arguments'])]
+        class ManualToolCall:
+            def __init__(self, name, arguments):
+                self.name = name
+                self.arguments = arguments
+                self.id = f"manual_{name}"
+                self.function = FunctionSpec(name, arguments)
 
-                # Execute the tool
-                await self.act()
-                logger.info(f"[WORKFLOW-DEBUG] Tool {next_tool['name']} executed successfully")
-                
-            except Exception as e:
-                logger.error(f"[WORKFLOW-ERROR] Error in manual workflow loop: {e}", exc_info=True)
-                break
+        self.tool_calls = [ManualToolCall(next_tool['name'], next_tool['arguments'])]
+
+        # Execute the tool
+        await self.act()
+        logger.info(f"[WORKFLOW-DEBUG] Tool {next_tool['name']} executed manually")
         
         return self._build_final_result()
 
@@ -429,8 +452,38 @@ START NOW with step 1.
             # Clear agent state from previous requests
             self.agent.clear()
 
-            # Run the agent
-            result = await self.agent.run(prompt)
+            # Run the agent manually to avoid SpoonOS framework timeouts
+            # The framework imposes a hardcoded 30s limit per step which is too short for Vision/Blockchain
+            await self.agent.add_message("user", prompt)
+            
+            # Manual run loop
+            from spoon_ai.schema import AgentState
+            self.agent.state = AgentState.RUNNING
+            
+            max_steps = 15
+            steps = 0
+            result = None
+            
+            while steps < max_steps and self.agent.state == AgentState.RUNNING:
+                steps += 1
+                logger.info(f"[WORKFLOW-CONTROL] Executing step {steps}/{max_steps}")
+                
+                try:
+                    # Call step directly, bypassing timeout wrapper in run()
+                    result = await self.agent.step()
+                    
+                    logger.info(f"[WORKFLOW-CONTROL] Step {steps} result: {str(result)[:100]}...")
+                    
+                    if self.agent.state == AgentState.FINISHED:
+                        logger.info("[WORKFLOW-CONTROL] Agent finished.")
+                        break
+                        
+                except Exception as e:
+                    logger.error(f"[WORKFLOW-CONTROL] Error in step {steps}: {e}")
+                    return {
+                        "success": False,
+                        "reason": f"Workflow error: {str(e)}"
+                    }
 
             # Clear context after processing
             _current_upload_context = {}
@@ -456,6 +509,18 @@ START NOW with step 1.
         try:
             # If result is a string, try to parse JSON from it
             if isinstance(result, str):
+                try:
+                    # Try to parse as JSON first
+                    parsed = json.loads(result)
+                    if isinstance(parsed, dict):
+                        # Ensure success field is set
+                        if "success" not in parsed:
+                            parsed["success"] = True
+                        return parsed
+                except json.JSONDecodeError:
+                    # Not valid JSON, treat as text response
+                    pass
+                
                 # Try to extract structured data from the text response
                 response = {
                     "success": True,

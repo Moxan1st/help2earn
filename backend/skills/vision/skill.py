@@ -100,7 +100,18 @@ async def analyze_image(image: bytes) -> dict:
         # Configure Gemini API key
         api_key = os.getenv("GEMINI_API_KEY")
         if api_key:
-            genai.configure(api_key=api_key)
+            # WORKAROUND: Disable SSL verification for Hackathon/Proxy env
+            import ssl
+            import urllib3
+            urllib3.disable_warnings()
+            try:
+                _create_unverified_https_context = ssl._create_unverified_context
+            except AttributeError:
+                pass
+            else:
+                ssl._create_default_https_context = _create_unverified_https_context
+            
+            genai.configure(api_key=api_key, transport="rest")
         else:
             logger.warning("GEMINI_API_KEY not set, using default credentials")
 
