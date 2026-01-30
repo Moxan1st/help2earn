@@ -71,9 +71,9 @@ class Help2EarnReactAgent(SpoonReactAI):
                     'latitude': ctx.get('lat'),
                     'longitude': ctx.get('lng'),
                     'facility_type': vision_result.get('facility_type'),
-                    'condition': vision_result.get('condition', ''),
                     'image_url': ctx.get('image_url', ''),
-                    'wallet_address': ctx.get('wallet')
+                    'contributor_address': ctx.get('wallet'),  # Note: parameter is contributor_address not wallet_address
+                    'ai_analysis': json.dumps(vision_result.get('details', {}))
                 }
             }
 
@@ -398,6 +398,9 @@ Step 5: Call database_save_reward with the facility_id and tx_hash from previous
 
 START NOW with step 1.
 """
+
+            # Clear agent state from previous requests
+            self.agent.clear()
 
             # Run the agent
             result = await self.agent.run(prompt)
