@@ -19,53 +19,162 @@ from spoon_ai.tools import ToolManager
 
 
 class Help2EarnReactAgent(SpoonReactAI):
-    """Custom ReAct Agent that doesn't terminate early on finish_reason."""
+    """Custom ReAct Agent that handles Gemini's lack of tool_choice support."""
 
-    # Track completed tools to know when workflow is done
-    _completed_tools: set = set()
+    # Track completed tools and their results
+    _completed_tools: list = []
+    _tool_results: dict = {}
 
-    def _should_terminate_on_finish_reason(self, response) -> bool:
-        """Override to prevent early termination - only stop when workflow is complete."""
-        # DEBUG: Log full response details
-        finish_reason = getattr(response, 'finish_reason', None)
-        native_finish_reason = getattr(response, 'native_finish_reason', None)
-        content = getattr(response, 'content', None)
-        tool_calls = getattr(response, 'tool_calls', None) or []
+    def _get_next_tool_call(self) -> Optional[dict]:
+        """Determine the next tool to call based on workflow state."""
+        completed_names = [t['name'] for t in self._completed_tools]
+        ctx = _current_upload_context
 
-        logger.info(f"[DEBUG] LLM Response Analysis:")
-        logger.info(f"  - finish_reason: {finish_reason}")
-        logger.info(f"  - native_finish_reason: {native_finish_reason}")
-        logger.info(f"  - tool_calls count: {len(tool_calls)}")
-        logger.info(f"  - content (first 500 chars): {str(content)[:500] if content else 'None'}")
+        logger.info(f"[WORKFLOW] Completed tools: {completed_names}")
+        logger.info(f"[WORKFLOW] Context keys: {list(ctx.keys())}")
 
-        # Check which tools have been executed
-        for tc in tool_calls:
-            tool_name = getattr(tc, 'name', None) or (tc.function.name if hasattr(tc, 'function') else None)
-            if tool_name:
-                self._completed_tools.add(tool_name)
-                logger.info(f"  - Tool called: {tool_name}")
+        # Workflow sequence
+        if 'vision_analyze' not in completed_names:
+            return {
+                'name': 'vision_analyze',
+                'arguments': {'image_base64': 'USE_CONTEXT'}
+            }
 
-        # Define required workflow tools
-        required_workflow = {'vision_analyze', 'anti_fraud_check', 'database_save_facility', 'blockchain_reward', 'database_save_reward'}
+        # Get vision result
+        vision_result = self._tool_results.get('vision_analyze', {})
+        if not vision_result.get('is_valid', False):
+            logger.info("[WORKFLOW] Vision invalid, stopping")
+            return None
 
-        logger.info(f"  - Completed tools so far: {self._completed_tools}")
+        if 'anti_fraud_check' not in completed_names:
+            return {
+                'name': 'anti_fraud_check',
+                'arguments': {
+                    'latitude': ctx.get('lat'),
+                    'longitude': ctx.get('lng'),
+                    'facility_type': vision_result.get('facility_type', 'unknown')
+                }
+            }
 
-        # Check if at least database_save_reward was called (workflow complete)
-        if 'database_save_reward' in self._completed_tools:
-            logger.info("Workflow complete - database_save_reward executed")
-            return True
+        # Get fraud check result
+        fraud_result = self._tool_results.get('anti_fraud_check', {})
+        if fraud_result.get('is_fraud', False):
+            logger.info("[WORKFLOW] Fraud detected, stopping")
+            return None
 
-        # If finish_reason is stop but workflow isn't complete, continue
-        if finish_reason == "stop" and len(self._completed_tools) < 5:
-            logger.info(f"[DEBUG] Preventing early termination - forcing continue")
-            return False
+        if 'database_save_facility' not in completed_names:
+            return {
+                'name': 'database_save_facility',
+                'arguments': {
+                    'latitude': ctx.get('lat'),
+                    'longitude': ctx.get('lng'),
+                    'facility_type': vision_result.get('facility_type'),
+                    'condition': vision_result.get('condition', ''),
+                    'image_url': ctx.get('image_url', ''),
+                    'wallet_address': ctx.get('wallet')
+                }
+            }
 
-        return super()._should_terminate_on_finish_reason(response)
+        # Get database result
+        db_result = self._tool_results.get('database_save_facility', {})
+        facility_id = db_result.get('facility_id')
+
+        if 'blockchain_reward' not in completed_names:
+            reward_amount = fraud_result.get('reward_amount', 50)
+            return {
+                'name': 'blockchain_reward',
+                'arguments': {
+                    'wallet_address': ctx.get('wallet'),
+                    'amount': reward_amount,
+                    'facility_type': vision_result.get('facility_type'),
+                    'latitude': ctx.get('lat'),
+                    'longitude': ctx.get('lng')
+                }
+            }
+
+        # Get blockchain result
+        blockchain_result = self._tool_results.get('blockchain_reward', {})
+        tx_hash = blockchain_result.get('tx_hash')
+
+        if 'database_save_reward' not in completed_names:
+            return {
+                'name': 'database_save_reward',
+                'arguments': {
+                    'wallet_address': ctx.get('wallet'),
+                    'amount': fraud_result.get('reward_amount', 50),
+                    'facility_id': facility_id,
+                    'tx_hash': tx_hash
+                }
+            }
+
+        logger.info("[WORKFLOW] All tools completed!")
+        return None
+
+    async def step(self) -> str:
+        """Override step to manually control workflow when Gemini returns empty."""
+        from spoon_ai.schema import AgentState, ToolCall
+
+        # First, try normal LLM-driven step
+        should_act = await self.think()
+
+        # If LLM returned tools, execute them normally
+        if self.tool_calls:
+            return await self.act()
+
+        # LLM returned empty - manually determine next tool
+        next_tool = self._get_next_tool_call()
+        if next_tool is None:
+            self.state = AgentState.FINISHED
+            return "Workflow complete or stopped due to validation failure."
+
+        # Create manual tool call
+        logger.info(f"[WORKFLOW] Manually injecting tool call: {next_tool['name']}")
+
+        # Create a ToolCall object
+        class ManualToolCall:
+            def __init__(self, name, arguments):
+                self.name = name
+                self.arguments = arguments
+                self.id = f"manual_{name}"
+
+        self.tool_calls = [ManualToolCall(next_tool['name'], next_tool['arguments'])]
+
+        # Execute the tool
+        return await self.act()
+
+    async def execute_tool(self, tool_call) -> str:
+        """Override to track tool results."""
+        result = await super().execute_tool(tool_call)
+
+        # Track completed tool
+        tool_name = getattr(tool_call, 'name', None)
+        if tool_name:
+            self._completed_tools.append({'name': tool_name})
+
+            # Parse and store result
+            try:
+                import json
+                # Result might be a string representation of dict
+                if isinstance(result, str) and result.startswith('{'):
+                    self._tool_results[tool_name] = json.loads(result)
+                elif isinstance(result, str) and 'Observed output' in result:
+                    # Extract dict from SpoonOS format
+                    import re
+                    match = re.search(r'\{.*\}', result, re.DOTALL)
+                    if match:
+                        self._tool_results[tool_name] = eval(match.group())
+            except Exception as e:
+                logger.warning(f"Could not parse tool result: {e}")
+
+            logger.info(f"[WORKFLOW] Tool {tool_name} completed, result stored")
+
+        return result
 
     def clear(self):
         """Clear state including completed tools."""
         super().clear()
-        self._completed_tools = set()
+        self._completed_tools = []
+        self._tool_results = {}
 
 # Global context for current upload (to avoid passing large data through LLM)
 _current_upload_context = {}
