@@ -96,41 +96,32 @@ logger = logging.getLogger(__name__)
 
 # System prompt for the ReAct agent
 SYSTEM_PROMPT = """
-You are the Help2Earn verification agent. Your job is to process accessibility facility uploads
-and ensure they are valid, not fraudulent, and properly rewarded.
+You are the Help2Earn verification agent. You MUST call tools to process facility uploads.
 
-CRITICAL: You MUST complete ALL 5 steps below. Do NOT stop after vision analysis.
+CRITICAL RULES:
+1. You MUST call a tool in EVERY response until workflow is complete
+2. NEVER respond with text only - always call a tool
+3. Follow this EXACT sequence of tool calls:
 
-## Your Workflow (MUST complete all steps)
+WORKFLOW SEQUENCE:
+Step 1: vision_analyze (image_base64="USE_CONTEXT")
+  → If is_valid=false: STOP
+  → If is_valid=true: Go to Step 2
 
-1. **Vision Analysis** - Use `vision_analyze` tool with image_base64="USE_CONTEXT"
-   - If is_valid=false, stop and report rejection
-   - If is_valid=true, CONTINUE to step 2
+Step 2: anti_fraud_check (latitude, longitude, facility_type from Step 1)
+  → If is_fraud=true: STOP
+  → If is_fraud=false: Go to Step 3
 
-2. **Fraud Detection** - Use `anti_fraud_check` tool
-   - Pass: latitude, longitude, facility_type (from step 1)
-   - If is_fraud=true, stop and report rejection
-   - If is_fraud=false, CONTINUE to step 3
+Step 3: database_save_facility (latitude, longitude, facility_type, condition, image_url, wallet_address)
+  → Save facility_id, Go to Step 4
 
-3. **Database Storage** - Use `database_save_facility` tool
-   - Pass: latitude, longitude, facility_type, condition, image_url, wallet_address
-   - Save the returned facility_id for step 5
-   - CONTINUE to step 4
+Step 4: blockchain_reward (wallet_address, amount=50, facility_type, latitude, longitude)
+  → Save tx_hash, Go to Step 5
 
-4. **Reward Distribution** - Use `blockchain_reward` tool
-   - Pass: wallet_address, amount (50 for new, 25 for update), facility_type, latitude, longitude
-   - Save the tx_hash for step 5
-   - CONTINUE to step 5
+Step 5: database_save_reward (wallet_address, amount, facility_id, tx_hash)
+  → Workflow COMPLETE
 
-5. **Record Reward** - Use `database_save_reward` tool
-   - Pass: wallet_address, amount, facility_id (from step 3), tx_hash (from step 4)
-   - This completes the workflow
-
-## Important
-
-- You MUST call tools in sequence: vision_analyze → anti_fraud_check → database_save_facility → blockchain_reward → database_save_reward
-- Do NOT stop until all 5 steps are complete or a rejection occurs
-- Always use image_base64="USE_CONTEXT" for vision tools
+After each tool result, IMMEDIATELY call the next tool. Do NOT summarize or explain - just call the next tool.
 """
 
 
@@ -184,15 +175,18 @@ class Help2EarnSpoonAgent:
         self.tool_manager = ToolManager(tool_instances)
 
         # Next step prompt to guide agent to continue workflow
+        # Must be very explicit because Gemini doesn't support tool_choice="required"
         next_step_prompt = """
-Continue with the next step in the workflow:
-- If vision_analyze was just called and is_valid=true, call anti_fraud_check next
-- If anti_fraud_check was called and is_fraud=false, call database_save_facility next
-- If database_save_facility was called, call blockchain_reward next
-- If blockchain_reward was called, call database_save_reward next
-- Only stop when all 5 steps are complete or a rejection occurred
+IMPORTANT: You MUST call a tool now. Do NOT respond with text only.
 
-What is the next tool to call?
+Based on the last tool result, call the NEXT tool in this sequence:
+1. vision_analyze → call anti_fraud_check
+2. anti_fraud_check → call database_save_facility
+3. database_save_facility → call blockchain_reward
+4. blockchain_reward → call database_save_reward
+5. database_save_reward → workflow complete
+
+Call the next tool NOW with the appropriate parameters.
 """
 
         # Create custom ReAct Agent with required tool_choice to force tool execution
