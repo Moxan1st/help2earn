@@ -116,52 +116,64 @@ class Help2EarnReactAgent(SpoonReactAI):
         """Override step to manually control workflow - loops until complete."""
         from spoon_ai.schema import AgentState
 
-        logger.info(f"[WORKFLOW] step() called, current state: {self.state}, completed: {[t['name'] for t in self._completed_tools]}")
+        logger.info(f"[WORKFLOW-DEBUG] step() called, current state: {self.state}, completed: {[t['name'] for t in self._completed_tools]}")
 
         # First, try normal LLM-driven step
-        should_act = await self.think()
+        try:
+            should_act = await self.think()
+            logger.info(f"[WORKFLOW-DEBUG] think() returned should_act={should_act}, tool_calls={len(self.tool_calls) if self.tool_calls else 0}, state={self.state}")
 
-        logger.info(f"[WORKFLOW] think() returned should_act={should_act}, tool_calls={len(self.tool_calls) if self.tool_calls else 0}, state={self.state}")
-
-        # If LLM returned tools, execute them normally and track
-        if self.tool_calls:
-            for tc in self.tool_calls:
-                tool_name = getattr(tc, 'name', None) or (tc.function.name if hasattr(tc, 'function') else None)
-                if tool_name:
-                    logger.info(f"[WORKFLOW] LLM selected tool: {tool_name}")
-            await self.act()
+            # If LLM returned tools, execute them normally and track
+            if self.tool_calls:
+                for tc in self.tool_calls:
+                    tool_name = getattr(tc, 'name', None) or (tc.function.name if hasattr(tc, 'function') else None)
+                    if tool_name:
+                        logger.info(f"[WORKFLOW-DEBUG] LLM selected tool: {tool_name}")
+                await self.act()
+        except Exception as e:
+            logger.error(f"[WORKFLOW-ERROR] Error in initial think/act: {e}")
 
         # Now continue with manual workflow until complete
         # This bypasses SpoonOS run loop issues with Gemini
-        while True:
-            next_tool = self._get_next_tool_call()
-            if next_tool is None:
-                logger.info("[WORKFLOW] Workflow complete!")
-                self.state = AgentState.FINISHED
-                return self._build_final_result()
+        loop_count = 0
+        while loop_count < 15:  # Safety break
+            loop_count += 1
+            try:
+                next_tool = self._get_next_tool_call()
+                if next_tool is None:
+                    logger.info("[WORKFLOW-DEBUG] Workflow complete!")
+                    self.state = AgentState.FINISHED
+                    return self._build_final_result()
 
-            # Reset state to RUNNING
-            self.state = AgentState.RUNNING
+                # Reset state to RUNNING
+                self.state = AgentState.RUNNING
 
-            logger.info(f"[WORKFLOW] Executing next tool: {next_tool['name']}")
+                logger.info(f"[WORKFLOW-DEBUG] Executing next tool: {next_tool['name']}")
 
-            # Create manual tool call
-            class FunctionSpec:
-                def __init__(self, name, arguments):
-                    self.name = name
-                    self.arguments = arguments
+                # Create manual tool call
+                class FunctionSpec:
+                    def __init__(self, name, arguments):
+                        self.name = name
+                        self.arguments = arguments
 
-            class ManualToolCall:
-                def __init__(self, name, arguments):
-                    self.name = name
-                    self.arguments = arguments
-                    self.id = f"manual_{name}"
-                    self.function = FunctionSpec(name, arguments)
+                class ManualToolCall:
+                    def __init__(self, name, arguments):
+                        self.name = name
+                        self.arguments = arguments
+                        self.id = f"manual_{name}"
+                        self.function = FunctionSpec(name, arguments)
 
-            self.tool_calls = [ManualToolCall(next_tool['name'], next_tool['arguments'])]
+                self.tool_calls = [ManualToolCall(next_tool['name'], next_tool['arguments'])]
 
-            # Execute the tool
-            await self.act()
+                # Execute the tool
+                await self.act()
+                logger.info(f"[WORKFLOW-DEBUG] Tool {next_tool['name']} executed successfully")
+                
+            except Exception as e:
+                logger.error(f"[WORKFLOW-ERROR] Error in manual workflow loop: {e}", exc_info=True)
+                break
+        
+        return self._build_final_result()
 
     def _build_final_result(self) -> str:
         """Build the final result from completed tools."""
