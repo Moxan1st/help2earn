@@ -116,8 +116,12 @@ class Help2EarnReactAgent(SpoonReactAI):
         """Override step to manually control workflow when Gemini returns empty."""
         from spoon_ai.schema import AgentState
 
+        logger.info(f"[WORKFLOW] step() called, current state: {self.state}, completed: {[t['name'] for t in self._completed_tools]}")
+
         # First, try normal LLM-driven step
         should_act = await self.think()
+
+        logger.info(f"[WORKFLOW] think() returned should_act={should_act}, tool_calls={len(self.tool_calls) if self.tool_calls else 0}, state={self.state}")
 
         # If LLM returned tools, execute them normally and track
         if self.tool_calls:
@@ -133,6 +137,9 @@ class Help2EarnReactAgent(SpoonReactAI):
         if next_tool is None:
             self.state = AgentState.FINISHED
             return "Workflow complete or stopped due to validation failure."
+
+        # Reset state to RUNNING (think() might have set it to FINISHED)
+        self.state = AgentState.RUNNING
 
         # Create manual tool call with proper structure
         logger.info(f"[WORKFLOW] Manually injecting tool call: {next_tool['name']}")
