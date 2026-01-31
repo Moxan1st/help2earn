@@ -203,7 +203,7 @@ export default function Home() {
           </div>
 
           {/* Right side: Wallet + Rewards */}
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-col items-end gap-2 select-none">
             <WalletButton />
             {isConnected && (
               <button
