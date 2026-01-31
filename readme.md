@@ -18,9 +18,9 @@
 
 ## 演示视频
 
-<video src="assets/videos/Help2Earn480P.mp4" controls="controls" style="max-width: 100%;">
-  您的浏览器不支持视频播放，请<a href="assets/videos/Help2Earn480P.mp4">下载视频</a>观看。
-</video>
+> 由于 GitHub README 不支持直接播放仓库内视频，请点击下方链接下载或观看：
+
+### 🎥 [点击观看 Help2Earn 演示视频 (MP4)](assets/videos/Help2Earn480P.mp4)
 
 ---
 
