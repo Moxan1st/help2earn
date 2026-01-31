@@ -76,30 +76,32 @@ export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
         </button>
 
         {/* Image */}
-        <div className="relative aspect-video bg-gray-200 shrink-0">
+        <div className="relative w-full bg-gray-200 shrink-0" style={{ maxHeight: '40vh', minHeight: '200px' }}>
           {facility.image_url && !imageError ? (
             <img
               src={facility.image_url}
               alt={facilityName.en}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain bg-black/5"
               onError={() => setImageError(true)}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
+            <div className="w-full h-full flex items-center justify-center text-gray-400 aspect-video">
               {imageError ? 'Failed to load image' : 'No image available'}
             </div>
           )}
 
-          {/* Type badge - Added text shadow for better readability on light backgrounds */}
-          <div className={`absolute bottom-3 left-3 ${facilityColor} text-white px-3 py-1 rounded-full text-sm font-medium shadow-sm border border-white/20`}>
-            {facilityName.zh}
+          {/* Type badge - Added background overlay for better readability */}
+          <div className="absolute bottom-3 left-3 flex flex-col gap-1 items-start">
+             <div className={`px-3 py-1 rounded-full text-sm font-medium text-white shadow-md border border-white/20 ${facilityColor}`}>
+               {facilityName.zh}
+             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-4 overflow-y-auto">
-          {/* Title */}
-          <h2 className="text-xl font-bold">{facilityName.en}</h2>
+        <div className="p-4 space-y-4 overflow-y-auto flex-1">
+          {/* Title - Ensure high contrast text */}
+          <h2 className="text-xl font-bold text-gray-900">{facilityName.en}</h2>
 
           {/* AI Analysis - Always visible */}
           {aiAnalysis.condition ? (
