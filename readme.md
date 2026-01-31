@@ -16,6 +16,12 @@
 | Help2EarnToken | [`0x491c88aBE3FE07dFD13e379dE44D427bA94CE4C9`](https://sepolia.etherscan.io/address/0x491c88aBE3FE07dFD13e379dE44D427bA94CE4C9) |
 | RewardDistributor | [`0xDf929aD0C7f32B9E3cce6B86dEaD2ff1522EF0A4`](https://sepolia.etherscan.io/address/0xDf929aD0C7f32B9E3cce6B86dEaD2ff1522EF0A4) |
 
+## 演示视频
+
+<video src="assets/videos/Help2Earn宣传视频.mp4" controls="controls" style="max-width: 100%;">
+  您的浏览器不支持视频播放，请<a href="assets/videos/Help2Earn宣传视频.mp4">下载视频</a>观看。
+</video>
+
 ---
 
 ## 核心场景
