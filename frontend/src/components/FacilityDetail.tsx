@@ -75,32 +75,32 @@ export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
           <X className="w-5 h-5 text-white" />
         </button>
 
-        {/* Image */}
-        <div className="relative w-full bg-gray-200 shrink-0" style={{ maxHeight: '40vh', minHeight: '200px' }}>
+        {/* Image - Fixed height to prevent layout shifts and scrolling issues */}
+        <div className="relative h-72 w-full bg-gray-100 shrink-0 border-b border-gray-100">
           {facility.image_url && !imageError ? (
             <img
               src={facility.image_url}
               alt={facilityName.en}
-              className="w-full h-full object-contain bg-black/5"
+              className="w-full h-full object-contain mix-blend-multiply"
               onError={() => setImageError(true)}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400 aspect-video">
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
               {imageError ? 'Failed to load image' : 'No image available'}
             </div>
           )}
 
-          {/* Type badge - Added background overlay for better readability */}
-          <div className="absolute bottom-3 left-3 flex flex-col gap-1 items-start">
-             <div className={`px-3 py-1 rounded-full text-sm font-medium text-white shadow-md border border-white/20 ${facilityColor}`}>
+          {/* Type badge */}
+          <div className="absolute bottom-3 left-3">
+             <div className={`px-3 py-1 rounded-full text-sm font-medium text-white shadow-sm ${facilityColor}`}>
                {facilityName.zh}
              </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-4 overflow-y-auto flex-1">
-          {/* Title - Ensure high contrast text */}
+        <div className="p-4 space-y-4 overflow-y-auto flex-1 bg-white">
+          {/* Title */}
           <h2 className="text-xl font-bold text-gray-900">{facilityName.en}</h2>
 
           {/* AI Analysis - Always visible */}
