@@ -18,8 +18,8 @@
 
 ## 演示视频
 
-<video src="assets/videos/Help2Earn宣传视频.mp4" controls="controls" style="max-width: 100%;">
-  您的浏览器不支持视频播放，请<a href="assets/videos/Help2Earn宣传视频.mp4">下载视频</a>观看。
+<video src="assets/videos/Help2Earn480P.mp4" controls="controls" style="max-width: 100%;">
+  您的浏览器不支持视频播放，请<a href="assets/videos/Help2Earn480P.mp4">下载视频</a>观看。
 </video>
 
 ---
