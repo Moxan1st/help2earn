@@ -50,3 +50,4 @@ pip-delete-this-directory.txt
 
 # Local uploads (Mock Storage)
 backend/uploads/
+PROGRESS.md
