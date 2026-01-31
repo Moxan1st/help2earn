@@ -73,7 +73,11 @@ class Help2EarnReactAgent(SpoonReactAI):
                     'facility_type': vision_result.get('facility_type'),
                     'image_url': ctx.get('image_url') or '',  # Handle None explicitly
                     'contributor_address': ctx.get('wallet'),  # Note: parameter is contributor_address not wallet_address
-                    'ai_analysis': json.dumps(vision_result.get('details', {}))
+                    # Save both condition and details
+                    'ai_analysis': json.dumps({
+                        'condition': vision_result.get('condition'),
+                        'details': vision_result.get('details', {})
+                    })
                 }
             }
 

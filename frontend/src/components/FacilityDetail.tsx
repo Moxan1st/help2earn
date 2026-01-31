@@ -9,10 +9,24 @@ const parseAiAnalysis = (analysis: string | undefined): { condition?: string; de
   if (!analysis) return {};
   try {
     const parsed = JSON.parse(analysis);
-    return {
-      condition: parsed.condition,
-      details: parsed.details ? JSON.stringify(parsed.details, null, 2) : undefined
-    };
+    // If parsed object has 'condition', use it.
+    // If previously saved only details (as dict), handle that legacy case? 
+    // New format: { condition: "...", details: {...} }
+    // Old format (buggy): { accessibility_features: ... } (just details)
+    
+    if (parsed.condition) {
+        return {
+            condition: parsed.condition,
+            details: parsed.details ? JSON.stringify(parsed.details, null, 2) : undefined
+        };
+    } else {
+        // Fallback for old data or if parsing structure is different
+        // If it looks like details object
+        return {
+            condition: undefined, // Or maybe try to generate one?
+            details: JSON.stringify(parsed, null, 2)
+        };
+    }
   } catch {
     return { condition: analysis };
   }
@@ -108,6 +122,12 @@ export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-xs font-medium text-gray-500 mb-1">AI Analysis</div>
               <p className="text-sm text-gray-700">{aiAnalysis.condition}</p>
+              {aiAnalysis.details && (
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <div className="text-xs font-medium text-gray-500 mb-1">Details</div>
+                    <pre className="text-xs text-gray-600 whitespace-pre-wrap">{aiAnalysis.details}</pre>
+                  </div>
+              )}
             </div>
           ) : (
             <div className="bg-gray-50 rounded-lg p-3">
