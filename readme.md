@@ -48,14 +48,14 @@
 
 ```mermaid
 graph TD
-    User[用户前端 Web/Mobile] -->|上传图片+GPS| API[Backend API (FastAPI)]
+    User["用户前端 Web/Mobile"] -->|上传图片+GPS| API["Backend API (FastAPI)"]
     
     subgraph "SpoonOS Core (Agent Layer)"
         API --> Agent{Help2Earn Agent}
-        Agent -->|1. 视觉感知| Vision[Gemini 2.0 Flash]
-        Agent -->|2. 风控校验| Fraud[Anti-Fraud Logic]
-        Agent -->|3. 数据存证| DB[(PostgreSQL + PostGIS)]
-        Agent -->|4. 链上激励| Chain[Blockchain Tool]
+        Agent -->|1. 视觉感知| Vision["Gemini 2.0 Flash"]
+        Agent -->|2. 风控校验| Fraud["Anti-Fraud Logic"]
+        Agent -->|3. 数据存证| DB[("PostgreSQL + PostGIS")]
+        Agent -->|4. 链上激励| Chain["Blockchain Tool"]
     end
     
     Chain -->|Mint Token| Contract[RewardDistributor]
