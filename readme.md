@@ -13,8 +13,8 @@
 
 | 合约 | 地址 |
 |------|------|
-| Help2EarnToken | [`0x491c88aBE3FE07dFD13e379dE44D427bA94CE4C9`](https://sepolia.etherscan.io/address/0x491c88aBE3FE07dFD13e379dE44D427bA94CE4C9) |
-| RewardDistributor | [`0xDf929aD0C7f32B9E3cce6B86dEaD2ff1522EF0A4`](https://sepolia.etherscan.io/address/0xDf929aD0C7f32B9E3cce6B86dEaD2ff1522EF0A4) |
+| Help2EarnToken | [`0x27c52186e40AcbEF3E631127Ae1eA4c6Ce07A182`](https://sepolia.etherscan.io/address/0x27c52186e40AcbEF3E631127Ae1eA4c6Ce07A182) |
+| RewardDistributor | [`0xF69dBF172Ee859151A34f47a7BB73da1010849f1`](https://sepolia.etherscan.io/address/0xF69dBF172Ee859151A34f47a7BB73da1010849f1) |
 
 ## 演示视频
 
