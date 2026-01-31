@@ -160,10 +160,10 @@ export default function Home() {
       </div>
 
       {/* Header overlay */}
-      <header className="absolute top-0 left-0 right-0 z-[100] p-4">
+      <header className="absolute top-0 left-0 right-0 z-[100] p-4 pointer-events-none">
         <div className="flex items-start justify-between">
           {/* Left side: Logo + Facility Types */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 pointer-events-auto">
             {/* Logo */}
             <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
               <MapPin className="w-5 h-5 text-primary-600" />
@@ -203,7 +203,7 @@ export default function Home() {
           </div>
 
           {/* Right side: Wallet + Rewards */}
-          <div className="flex flex-col items-end gap-2 select-none">
+          <div className="flex flex-col items-end gap-2 select-none pointer-events-auto">
             <WalletButton />
             {isConnected && (
               <button
@@ -223,8 +223,8 @@ export default function Home() {
       </header>
 
       {/* Bottom action bar */}
-      <div className="absolute bottom-0 left-0 right-0 z-[100] p-4 pb-8">
-        <div className="flex items-center justify-center gap-4">
+      <div className="absolute bottom-0 left-0 right-0 z-[100] p-4 pb-8 pointer-events-none">
+        <div className="flex items-center justify-center gap-4 pointer-events-auto">
           {/* Camera button (main action) */}
           <CameraButton
             userLocation={userLocation}
