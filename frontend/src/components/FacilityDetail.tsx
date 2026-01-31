@@ -122,12 +122,67 @@ export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-xs font-medium text-gray-500 mb-1">AI Analysis</div>
               <p className="text-sm text-gray-700">{aiAnalysis.condition}</p>
-              {aiAnalysis.details && (
-                  <div className="mt-2 pt-2 border-t border-gray-200">
-                    <div className="text-xs font-medium text-gray-500 mb-1">Details</div>
-                    <pre className="text-xs text-gray-600 whitespace-pre-wrap">{aiAnalysis.details}</pre>
-                  </div>
-              )}
+              
+              {/* Parse and display details if available */}
+              {(() => {
+                if (!aiAnalysis.details) return null;
+                try {
+                  const details = JSON.parse(aiAnalysis.details);
+                  return (
+                    <div className="mt-3 pt-2 border-t border-gray-200 space-y-3">
+                      {/* Features */}
+                      {details.accessibility_features && details.accessibility_features.length > 0 && (
+                        <div>
+                          <div className="text-xs font-medium text-green-600 mb-1 flex items-center gap-1">
+                            <span>✓</span> Features
+                          </div>
+                          <ul className="list-disc list-inside text-xs text-gray-600 space-y-1 ml-1">
+                            {details.accessibility_features.map((item: string, i: number) => (
+                              <li key={i}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Issues */}
+                      {details.potential_issues && details.potential_issues.length > 0 && (
+                        <div>
+                          <div className="text-xs font-medium text-amber-600 mb-1 flex items-center gap-1">
+                            <span>⚠</span> Potential Issues
+                          </div>
+                          <ul className="list-disc list-inside text-xs text-gray-600 space-y-1 ml-1">
+                            {details.potential_issues.map((item: string, i: number) => (
+                              <li key={i}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Recommendations */}
+                      {details.recommendations && details.recommendations.length > 0 && (
+                        <div>
+                          <div className="text-xs font-medium text-blue-600 mb-1 flex items-center gap-1">
+                            <span>💡</span> Recommendations
+                          </div>
+                          <ul className="list-disc list-inside text-xs text-gray-600 space-y-1 ml-1">
+                            {details.recommendations.map((item: string, i: number) => (
+                              <li key={i}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  );
+                } catch (e) {
+                  // Fallback for non-JSON string
+                  return (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <div className="text-xs font-medium text-gray-500 mb-1">Details</div>
+                      <pre className="text-xs text-gray-600 whitespace-pre-wrap font-sans">{aiAnalysis.details}</pre>
+                    </div>
+                  );
+                }
+              })()}
             </div>
           ) : (
             <div className="bg-gray-50 rounded-lg p-3">

@@ -99,6 +99,7 @@ export const api = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 60000, // 60 seconds timeout for upload
     });
 
     return response.data;

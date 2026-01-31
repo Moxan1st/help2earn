@@ -104,6 +104,7 @@ export default function Home() {
 
   const handleUploadStart = (promise: Promise<UploadResponse>, context: { image_url: string, lat: number, lng: number }) => {
     setIsUploading(true);
+    toast.loading('Waiting for verification...', { id: 'upload-toast' });
     
     // Handle the promise in background
     promise
@@ -125,15 +126,15 @@ export default function Home() {
           handleUploadSuccess(newFacility);
           toast.success(
             `Verified! You earned ${result.reward_amount} H2E tokens`,
-            { duration: 5000 }
+            { id: 'upload-toast', duration: 5000 }
           );
         } else {
-          toast.error(result.reason || 'Verification failed');
+          toast.error(result.reason || 'Verification failed', { id: 'upload-toast' });
         }
       })
       .catch((error) => {
         console.error('Upload error:', error);
-        toast.error('Upload failed. Please try again.');
+        toast.error('Upload failed. Please try again.', { id: 'upload-toast' });
       })
       .finally(() => {
         setIsUploading(false);
