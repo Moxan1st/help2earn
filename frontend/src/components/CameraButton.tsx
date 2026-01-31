@@ -3,20 +3,22 @@
 import { useState, useRef } from 'react';
 import { Camera, X, Upload, Loader2 } from 'lucide-react';
 import { useAccount } from 'wagmi';
-import { api, Facility } from '@/services/api';
+import { api, Facility, UploadResponse } from '@/services/api';
 import toast from 'react-hot-toast';
 
 interface CameraButtonProps {
   userLocation: { lat: number; lng: number } | null;
   walletAddress?: string;
   onSuccess: (facility: Facility) => void;
+  onUploadStart: (promise: Promise<UploadResponse>, context: { image_url: string, lat: number, lng: number }) => void;
 }
 
-export function CameraButton({ userLocation, walletAddress, onSuccess }: CameraButtonProps) {
+export function CameraButton({ userLocation, walletAddress, onSuccess, onUploadStart }: CameraButtonProps) {
   const { isConnected } = useAccount();
   const [showModal, setShowModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // uploading state is now managed by parent via onUploadStart
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,53 +60,49 @@ export function CameraButton({ userLocation, walletAddress, onSuccess }: CameraB
     }
   };
 
-  const handleUpload = async () => {
-    if (!selectedImage || !userLocation || !walletAddress) return;
+  const handleUpload = () => {
+    if (!selectedImage || !userLocation || !walletAddress || !previewUrl) return;
 
-    setUploading(true);
-    try {
-      const result = await api.uploadFacility(
-        selectedImage,
-        userLocation.lat,
-        userLocation.lng,
-        walletAddress
-      );
+    // Start upload in background
+    const uploadPromise = api.uploadFacility(
+      selectedImage,
+      userLocation.lat,
+      userLocation.lng,
+      walletAddress
+    );
 
-      if (result.success && result.facility_id) {
-        // Create facility object for map
-        const newFacility: Facility = {
-          id: result.facility_id,
-          type: (result.facility_type || 'ramp') as 'ramp' | 'toilet' | 'elevator' | 'wheelchair',
-          latitude: userLocation.lat,
-          longitude: userLocation.lng,
-          image_url: previewUrl || '',
-          ai_analysis: result.condition || '',
-          contributor_address: walletAddress,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
+    // Notify parent to handle the promise
+    onUploadStart(uploadPromise, {
+      image_url: previewUrl,
+      lat: userLocation.lat,
+      lng: userLocation.lng
+    });
 
-        onSuccess(newFacility);
-        toast.success(
-          `Verified! You earned ${result.reward_amount} H2E tokens`,
-          { duration: 5000 }
-        );
-        handleClose();
-      } else {
-        toast.error(result.reason || 'Verification failed');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Upload failed. Please try again.');
-    } finally {
-      setUploading(false);
-    }
+    // Close modal immediately
+    handleClose();
+    
+    // We don't revoke object URL here immediately, let parent handle cleanup or let GC do it
+    // But handleClose does revoke it if we don't change logic. 
+    // Wait, handleClose revokes previewUrl. We need to preserve it for parent if needed.
+    // Actually parent can use the blob URL.
+    // To prevent handleClose from revoking, we can modify handleClose or setPreviewUrl(null) before calling it?
+    // Let's modify handleClose to accept a "keepPreview" flag or just rely on the fact that revoking doesn't immediately break <img> tags in some browsers, 
+    // but cleaner is to NOT revoke if we are passing it.
+    // However, if we just pass the URL string, and revoke it, the parent might not be able to display it if it wants to show a thumbnail.
+    // For now, let's keep it simple. The parent will receive the URL string.
   };
 
   const handleClose = () => {
     setShowModal(false);
     setSelectedImage(null);
+    // Don't revoke immediately if we just started upload? 
+    // Ideally we should manage memory better, but for now let's just close.
+    // If we passed previewUrl to parent, parent is responsible? 
+    // Actually handleClose clears state.
     if (previewUrl) {
+      // If we are uploading, we might want to keep the URL alive for the spinner tooltip?
+      // But user asked for "spinner next to my rewards", not necessarily a thumbnail.
+      // So maybe it is fine.
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
     }

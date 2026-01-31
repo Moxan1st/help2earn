@@ -7,8 +7,8 @@ import { WalletButton } from '@/components/WalletButton';
 import { CameraButton } from '@/components/CameraButton';
 import { FacilityDetail } from '@/components/FacilityDetail';
 import { RewardsPanel } from '@/components/RewardsPanel';
-import { api, Facility } from '@/services/api';
-import { MapPin, Trophy, Info } from 'lucide-react';
+import { api, Facility, UploadResponse } from '@/services/api';
+import { MapPin, Trophy, Info, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { RampIcon, ToiletIcon, ElevatorIcon, WheelchairIcon } from '@/icons';
 
@@ -29,6 +29,8 @@ export default function Home() {
   const [showRewards, setShowRewards] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  // State for background uploading
+  const [isUploading, setIsUploading] = useState(false);
 
   // Get user location on mount
   useEffect(() => {
@@ -100,6 +102,44 @@ export default function Home() {
     toast.success('Facility verified! Reward sent to your wallet.');
   };
 
+  const handleUploadStart = (promise: Promise<UploadResponse>, context: { image_url: string, lat: number, lng: number }) => {
+    setIsUploading(true);
+    
+    // Handle the promise in background
+    promise
+      .then((result) => {
+        if (result.success && result.facility_id) {
+          // Create facility object
+          const newFacility: Facility = {
+            id: result.facility_id,
+            type: (result.facility_type || 'ramp') as 'ramp' | 'toilet' | 'elevator' | 'wheelchair',
+            latitude: context.lat,
+            longitude: context.lng,
+            image_url: context.image_url,
+            ai_analysis: result.condition || '',
+            contributor_address: address || '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          handleUploadSuccess(newFacility);
+          toast.success(
+            `Verified! You earned ${result.reward_amount} H2E tokens`,
+            { duration: 5000 }
+          );
+        } else {
+          toast.error(result.reason || 'Verification failed');
+        }
+      })
+      .catch((error) => {
+        console.error('Upload error:', error);
+        toast.error('Upload failed. Please try again.');
+      })
+      .finally(() => {
+        setIsUploading(false);
+      });
+  };
+
   const handleFacilityClick = (facility: Facility) => {
     setSelectedFacility(facility);
   };
@@ -169,7 +209,11 @@ export default function Home() {
                 onClick={() => setShowRewards(true)}
                 className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg hover:bg-white transition-colors"
               >
-                <Trophy className="w-4 h-4 text-amber-500" />
+                {isUploading ? (
+                  <Loader2 className="w-4 h-4 text-primary-600 animate-spin" />
+                ) : (
+                  <Trophy className="w-4 h-4 text-amber-500" />
+                )}
                 <span className="font-semibold text-sm text-gray-800">My Rewards</span>
               </button>
             )}
@@ -185,6 +229,7 @@ export default function Home() {
             userLocation={userLocation}
             walletAddress={address}
             onSuccess={handleUploadSuccess}
+            onUploadStart={handleUploadStart}
           />
 
           {/* Info button */}
