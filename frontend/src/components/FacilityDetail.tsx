@@ -37,7 +37,7 @@ const FACILITY_NAMES: Record<string, { en: string; zh: string }> = {
   ramp: { en: 'Wheelchair Ramp', zh: '无障碍坡道' },
   toilet: { en: 'Accessible Toilet', zh: '无障碍厕所' },
   elevator: { en: 'Accessible Elevator', zh: '无障碍电梯' },
-  wheelchair: { en: 'Wheelchair Station', zh: '轮椅借用处' },
+  wheelchair: { en: 'Wheelchair Rent', zh: '轮椅借用处' },
 };
 
 // Facility type colors
