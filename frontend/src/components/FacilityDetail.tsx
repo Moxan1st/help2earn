@@ -84,7 +84,7 @@ export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 bg-black/30 hover:bg-black/50 rounded-full p-1 transition-colors"
+          className="absolute top-4 right-4 z-10 bg-black/30 hover:bg-black/50 rounded-full p-1 transition-colors pointer-events-auto"
         >
           <X className="w-5 h-5 text-white" />
         </button>
