@@ -66,7 +66,7 @@ export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
       />
 
       {/* Modal content */}
-      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md sm:mx-4 max-h-[80vh] overflow-hidden">
+      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md sm:mx-4 max-h-[80vh] overflow-hidden flex flex-col">
         {/* Close button */}
         <button
           onClick={onClose}
@@ -76,7 +76,7 @@ export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
         </button>
 
         {/* Image */}
-        <div className="relative aspect-video bg-gray-200">
+        <div className="relative aspect-video bg-gray-200 shrink-0">
           {facility.image_url && !imageError ? (
             <img
               src={facility.image_url}
@@ -90,22 +90,27 @@ export function FacilityDetail({ facility, onClose }: FacilityDetailProps) {
             </div>
           )}
 
-          {/* Type badge */}
-          <div className={`absolute bottom-3 left-3 ${facilityColor} text-white px-3 py-1 rounded-full text-sm font-medium`}>
+          {/* Type badge - Added text shadow for better readability on light backgrounds */}
+          <div className={`absolute bottom-3 left-3 ${facilityColor} text-white px-3 py-1 rounded-full text-sm font-medium shadow-sm border border-white/20`}>
             {facilityName.zh}
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 overflow-y-auto">
           {/* Title */}
           <h2 className="text-xl font-bold">{facilityName.en}</h2>
 
-          {/* AI Analysis */}
-          {aiAnalysis.condition && (
+          {/* AI Analysis - Always visible */}
+          {aiAnalysis.condition ? (
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-xs font-medium text-gray-500 mb-1">AI Analysis</div>
               <p className="text-sm text-gray-700">{aiAnalysis.condition}</p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-xs font-medium text-gray-500 mb-1">AI Analysis</div>
+              <p className="text-sm text-gray-500 italic">Analysis data not available</p>
             </div>
           )}
 
